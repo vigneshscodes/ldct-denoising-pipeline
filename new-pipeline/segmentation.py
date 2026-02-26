@@ -33,10 +33,10 @@ def load_segmentation_model(model_path):
 def preprocess_for_model(img_norm):
 
     # Convert grayscale to 3 channel
-    img_3ch = np.stack([img_norm]*3, axis=-1)
+    img_3ch = np.stack([img_norm]*3, axis=-1).astype(np.float32)
 
     # Resize to 256x256 (model training size)
-    img_resized = cv2.resize(img_3ch, (256, 256))
+    img_resized = cv2.resize(img_3ch, (256, 256)).astype(np.float32)
 
     transform = transforms.Compose([
         transforms.ToTensor(),
