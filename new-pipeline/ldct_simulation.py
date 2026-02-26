@@ -7,7 +7,7 @@ def simulate_ldct(img_norm,
                   lower,
                   upper,
                   dose_factor=0.25,
-                  base_photon_count=3000,
+                  base_photon_count=1500,
                   gaussian_sigma=0.003):
     """
     Realistic LDCT simulation using signal-dependent Poisson noise.
