@@ -1,4 +1,8 @@
+torch
+torchvision
+segmentation-models-pytorch
 numpy
 opencv-python
+pydicom
+pywavelets
 matplotlib
-PyWavelets
