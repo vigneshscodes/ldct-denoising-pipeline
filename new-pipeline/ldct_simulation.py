@@ -5,10 +5,11 @@ import numpy as np
 
 def simulate_ldct(img_norm, lower, upper,
                   dose_factor=0.25,
-                  gaussian_sigma=0.01):
+                  gaussian_sigma=0.005):
 
     # Scale intensity to simulate dose reduction
-    scaled = img_norm * dose_factor
+    scaled = img_norm
+    poisson = np.random.poisson(img_norm * (dose_factor * 1000)) / (dose_factor * 1000)
 
     # Poisson noise (photon noise)
     poisson = np.random.poisson(scaled * 1000) / 1000.0
