@@ -8,7 +8,7 @@ import cv2
 # ------------------------------
 # Wavelet shrinkage
 # ------------------------------
-def wavelet_denoise(img_norm, wavelet='db1', level=2, threshold=0.02):
+def wavelet_denoise(img_norm, wavelet='db1', level=2, threshold=0.03):
 
     coeffs = pywt.wavedec2(img_norm, wavelet, level=level)
 
@@ -31,7 +31,7 @@ def wavelet_denoise(img_norm, wavelet='db1', level=2, threshold=0.02):
 # ------------------------------
 # CLAHE enhancement
 # ------------------------------
-def apply_clahe(img_norm, clip_limit=3.0):
+def apply_clahe(img_norm, clip_limit=2.5):
 
     img_uint8 = (img_norm * 255).astype(np.uint8)
 
