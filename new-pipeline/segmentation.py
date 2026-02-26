@@ -61,17 +61,13 @@ def predict_lung_mask(model, img_norm):
     with torch.no_grad():
         output = model(input_tensor)
 
-    # Get probability map
     probs = torch.sigmoid(output)
-
     probs = probs.squeeze().cpu().numpy()
 
-    # Lung class is usually channel 0
-    lung_prob = probs[0]
+    lung_prob = cv2.resize(probs[0], (img_norm.shape[1], img_norm.shape[0]))
 
-    # Resize back to original size
-    lung_prob = cv2.resize(lung_prob, (img_norm.shape[1], img_norm.shape[0]))
-
+    # temporarily return first channel just to continue pipeline
+    lung_prob = cv2.resize(probs[0], (img_norm.shape[1], img_norm.shape[0]))
     return lung_prob
 
 
