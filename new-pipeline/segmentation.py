@@ -64,8 +64,6 @@ def predict_lung_mask(model, img_norm):
     probs = torch.sigmoid(output)
     probs = probs.squeeze().cpu().numpy()
 
-    lung_prob = cv2.resize(probs[0], (img_norm.shape[1], img_norm.shape[0]))
-
     # temporarily return first channel just to continue pipeline
     lung_prob = cv2.resize(probs[0], (img_norm.shape[1], img_norm.shape[0]))
     return lung_prob

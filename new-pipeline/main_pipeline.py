@@ -80,50 +80,48 @@ for root, dirs, files in os.walk(INPUT_ROOT):
         base_name = os.path.splitext(file)[0]
 
         # --------------------------
-        # STEP 1: Load & Window
+        # STEP 1: Load ORIGINAL HU
         # --------------------------
         ds, img_hu = load_dicom(input_path)
+
+        # --------------------------
+        # REGION MASKS FROM ORIGINAL HU  (FIXED)
+        # --------------------------
+        bone_mask = create_bone_mask(img_hu)             # FIXED
+        body_mask = (img_hu > -500).astype(np.uint8)     # FIXED
+
+        # --------------------------
+        # STEP 2: Apply Lung Window
+        # --------------------------
         img_norm, lower, upper = apply_lung_window(img_hu)
 
         # --------------------------
-        # STEP 2: Simulate LDCT
+        # STEP 3: Simulate LDCT
         # --------------------------
         ldct_norm, ldct_hu = simulate_ldct(img_norm, lower, upper)
         save_dicom(ds, ldct_hu, ldct_path)
 
         # --------------------------
-        # STEP 3: Enhancement
+        # STEP 4: Enhancement
         # --------------------------
         enhanced_norm = enhance_ldct(ldct_norm)
         enhanced_hu = enhanced_norm * (upper - lower) + lower
         save_dicom(ds, enhanced_hu, enh_path)
 
         # --------------------------
-        # STEP 4: Lung Segmentation
+        # STEP 5: Lung Segmentation
         # --------------------------
         lung_prob = predict_lung_mask(seg_model, enhanced_norm)
         lung_mask = postprocess_lung_mask(lung_prob)
 
-        # Quick sanity check (only middle slices will show larger %)
         lung_percent = np.sum(lung_mask) / lung_mask.size * 100
         print(f"{file} → Lung area: {lung_percent:.2f}%")
 
-        # Overlay for visual verification
         overlay = enhanced_norm.copy()
         overlay[lung_mask == 1] = 1
 
         # --------------------------
-        # STEP 5: Bone Mask (HU > 300)
-        # --------------------------
-        bone_mask = create_bone_mask(enhanced_hu)
-
-        # --------------------------
-        # STEP 6: Body Mask
-        # --------------------------
-        body_mask = (enhanced_hu > -500).astype(np.uint8)
-
-        # --------------------------
-        # STEP 7: Soft Tissue Mask
+        # STEP 6: Soft Tissue Mask (FIXED ORDER)
         # --------------------------
         soft_mask = create_soft_tissue_mask(body_mask, lung_mask, bone_mask)
 
