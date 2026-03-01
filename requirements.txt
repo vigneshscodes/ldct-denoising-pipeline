@@ -6,3 +6,5 @@ opencv-python
 pydicom
 pywavelets
 matplotlib
+scikit-image
+pandas
