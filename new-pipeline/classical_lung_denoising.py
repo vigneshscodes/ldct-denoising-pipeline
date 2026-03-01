@@ -11,6 +11,7 @@ from bm3d import bm3d
 # ----------------------------
 LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
+PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
 
 # ----------------------------
 # Utility Functions
@@ -22,6 +23,7 @@ def load_image(path):
     return img
 
 def save_image(img, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     img_uint8 = np.clip(img * 255, 0, 255).astype(np.uint8)
     cv2.imwrite(path, img_uint8)
 
@@ -66,6 +68,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         relative_path = os.path.relpath(root, LDCT_ROOT)
 
         enh_folder = os.path.join(ENH_ROOT, relative_path)
+        phase1_folder = os.path.join(PHASE1_ROOT, relative_path)
 
         enhanced_path = os.path.join(enh_folder, base_name + "_enhanced.png")
         mask_path     = os.path.join(enh_folder, base_name + "_lung_mask.png")
@@ -73,26 +76,26 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         if not os.path.exists(enhanced_path) or not os.path.exists(mask_path):
             continue
 
-        # Load enhanced image & mask
         img = load_image(enhanced_path)
         lung_mask = load_image(mask_path)
         lung_mask = (lung_mask > 0.5).astype(np.float32)
 
+        # Skip very small lung slices
+        if np.sum(lung_mask) / lung_mask.size < 0.05:
+            continue
+
         print(f"Processing {base_name}")
 
-        # Apply classical filters
         bilateral = apply_bilateral(img)
         nlm       = apply_nlm(img)
         bm3d_out  = apply_bm3d(img)
 
-        # Lung-focused blending
         bilateral_lung = lung_mask * bilateral + (1 - lung_mask) * img
         nlm_lung       = lung_mask * nlm + (1 - lung_mask) * img
         bm3d_lung      = lung_mask * bm3d_out + (1 - lung_mask) * img
 
-        # Save outputs
-        save_image(bilateral_lung, os.path.join(enh_folder, base_name + "_bilateral_lung.png"))
-        save_image(nlm_lung,       os.path.join(enh_folder, base_name + "_nlm_lung.png"))
-        save_image(bm3d_lung,      os.path.join(enh_folder, base_name + "_bm3d_lung.png"))
+        save_image(bilateral_lung, os.path.join(phase1_folder, base_name + "_bilateral_lung.png"))
+        save_image(nlm_lung,       os.path.join(phase1_folder, base_name + "_nlm_lung.png"))
+        save_image(bm3d_lung,      os.path.join(phase1_folder, base_name + "_bm3d_lung.png"))
 
-print("Classical lung-focused denoising completed.")
+print("Phase 1 classical lung-focused denoising completed.")

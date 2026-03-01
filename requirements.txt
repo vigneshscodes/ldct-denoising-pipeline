@@ -8,3 +8,4 @@ pywavelets
 matplotlib
 scikit-image
 pandas
+bm3d
