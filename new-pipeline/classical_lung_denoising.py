@@ -1,5 +1,3 @@
-# classical_lung_denoising.py
-
 import os
 import cv2
 import numpy as np
@@ -12,6 +10,8 @@ from bm3d import bm3d
 LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
+
+MAX_PATIENTS = 8   # ✅ LIMIT HERE
 
 # ----------------------------
 # Utility Functions
@@ -55,17 +55,32 @@ def apply_bm3d(img):
     return bm3d_out.astype(np.float32)
 
 # ----------------------------
-# MAIN LOOP
+# MAIN LOOP (PATIENT LIMITED)
 # ----------------------------
 
+processed_patients = set()
+
 for root, dirs, files in os.walk(LDCT_ROOT):
+
+    # Identify patient folder by relative path
+    relative_path = os.path.relpath(root, LDCT_ROOT)
+
+    if relative_path == ".":
+        continue
+
+    patient_id = relative_path.split(os.sep)[0]
+
+    if patient_id not in processed_patients:
+        if len(processed_patients) >= MAX_PATIENTS:
+            break
+        processed_patients.add(patient_id)
+
     for file in files:
 
         if not file.endswith("_ndct.png"):
             continue
 
         base_name = file.replace("_ndct.png", "")
-        relative_path = os.path.relpath(root, LDCT_ROOT)
 
         enh_folder = os.path.join(ENH_ROOT, relative_path)
         phase1_folder = os.path.join(PHASE1_ROOT, relative_path)
@@ -80,7 +95,6 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         lung_mask = load_image(mask_path)
         lung_mask = (lung_mask > 0.5).astype(np.float32)
 
-        # Skip very small lung slices
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
 

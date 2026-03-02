@@ -1,5 +1,3 @@
-# metrics_phase1.py
-
 import os
 import cv2
 import numpy as np
@@ -11,6 +9,7 @@ ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
 
 OUTPUT_CSV = "phase1_comparison.csv"
+MAX_PATIENTS = 8   # ✅ LIMIT HERE
 
 def load_image(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
@@ -40,14 +39,28 @@ results = {
 
 ssim_results = {k: [] for k in results.keys()}
 
+processed_patients = set()
+
 for root, dirs, files in os.walk(LDCT_ROOT):
+
+    relative_path = os.path.relpath(root, LDCT_ROOT)
+
+    if relative_path == ".":
+        continue
+
+    patient_id = relative_path.split(os.sep)[0]
+
+    if patient_id not in processed_patients:
+        if len(processed_patients) >= MAX_PATIENTS:
+            break
+        processed_patients.add(patient_id)
+
     for file in files:
 
         if not file.endswith("_ndct.png"):
             continue
 
         base_name = file.replace("_ndct.png", "")
-        relative_path = os.path.relpath(root, LDCT_ROOT)
 
         enh_folder = os.path.join(ENH_ROOT, relative_path)
         phase1_folder = os.path.join(PHASE1_ROOT, relative_path)
@@ -86,7 +99,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
                 results[name].append(psnr)
                 ssim_results[name].append(ssim)
 
-print("\n===== Phase 1 Lung-Focused Comparison =====\n")
+print("\n===== Phase 1 Lung-Focused Comparison (8 Patients) =====\n")
 
 for method in results.keys():
     print(f"{method}")
