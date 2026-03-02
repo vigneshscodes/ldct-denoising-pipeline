@@ -39,7 +39,12 @@ results = {
 ssim_results = {k: [] for k in results.keys()}
 
 # 🔒 STRICT: Only look at Phase1 folders
-patient_folders = sorted(os.listdir(PHASE1_ROOT))[:MAX_PATIENTS]
+patient_folders = sorted([
+    f for f in os.listdir(PHASE1_ROOT)
+    if f.startswith("LIDC-IDRI-")
+])[:MAX_PATIENTS]
+
+print("Evaluating ONLY these patients:", patient_folders)
 
 print("Evaluating ONLY these patients:")
 print(patient_folders)
