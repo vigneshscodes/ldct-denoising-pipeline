@@ -7,6 +7,11 @@ from skimage.metrics import structural_similarity
 LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
+PATIENT_BASE = os.path.join(
+    PHASE1_ROOT,
+    "manifest-1770741989405",
+    "LIDC-IDRI"
+)
 
 OUTPUT_CSV = "phase1_comparison_8patients.csv"
 MAX_PATIENTS = 8
@@ -40,7 +45,7 @@ ssim_results = {k: [] for k in results.keys()}
 
 # 🔒 STRICT: Only look at Phase1 folders
 patient_folders = sorted([
-    f for f in os.listdir(PHASE1_ROOT)
+    f for f in os.listdir(PATIENT_BASE)
     if f.startswith("LIDC-IDRI-")
 ])[:MAX_PATIENTS]
 
