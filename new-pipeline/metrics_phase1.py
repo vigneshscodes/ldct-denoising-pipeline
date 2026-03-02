@@ -8,13 +8,12 @@ LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
 
-OUTPUT_CSV = "phase1_comparison.csv"
-MAX_PATIENTS = 8   # ✅ LIMIT HERE
+OUTPUT_CSV = "phase1_comparison_8patients.csv"
+MAX_PATIENTS = 8
 
 def load_image(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    img = img.astype(np.float32) / 255.0
-    return img
+    return img.astype(np.float32) / 255.0
 
 def compute_psnr(gt, pred, mask):
     gt_lung = gt[mask == 1]
@@ -39,43 +38,39 @@ results = {
 
 ssim_results = {k: [] for k in results.keys()}
 
-processed_patients = set()
+# 🔒 STRICT: Only look at Phase1 folders
+patient_folders = sorted(os.listdir(PHASE1_ROOT))[:MAX_PATIENTS]
 
-for root, dirs, files in os.walk(LDCT_ROOT):
+print("Evaluating ONLY these patients:")
+print(patient_folders)
 
-    relative_path = os.path.relpath(root, LDCT_ROOT)
+for patient_id in patient_folders:
 
-    if relative_path == ".":
+    patient_ldct_path = os.path.join(LDCT_ROOT, patient_id)
+    patient_enh_path  = os.path.join(ENH_ROOT, patient_id)
+    patient_phase1_path = os.path.join(PHASE1_ROOT, patient_id)
+
+    if not os.path.isdir(patient_phase1_path):
         continue
 
-    patient_id = relative_path.split(os.sep)[0]
+    for file in os.listdir(patient_phase1_path):
 
-    if patient_id not in processed_patients:
-        if len(processed_patients) >= MAX_PATIENTS:
-            break
-        processed_patients.add(patient_id)
-
-    for file in files:
-
-        if not file.endswith("_ndct.png"):
+        if not file.endswith("_bilateral_lung.png"):
             continue
 
-        base_name = file.replace("_ndct.png", "")
+        base_name = file.replace("_bilateral_lung.png", "")
 
-        enh_folder = os.path.join(ENH_ROOT, relative_path)
-        phase1_folder = os.path.join(PHASE1_ROOT, relative_path)
+        ndct_path = os.path.join(patient_ldct_path, base_name + "_ndct.png")
+        ldct_path = os.path.join(patient_ldct_path, base_name + "_ldct.png")
+        enh_path  = os.path.join(patient_enh_path, base_name + "_enhanced.png")
+        mask_path = os.path.join(patient_enh_path, base_name + "_lung_mask.png")
 
-        ndct_path = os.path.join(root, base_name + "_ndct.png")
-        ldct_path = os.path.join(root, base_name + "_ldct.png")
-        enh_path  = os.path.join(enh_folder, base_name + "_enhanced.png")
-        mask_path = os.path.join(enh_folder, base_name + "_lung_mask.png")
-
-        bil_path  = os.path.join(phase1_folder, base_name + "_bilateral_lung.png")
-        nlm_path  = os.path.join(phase1_folder, base_name + "_nlm_lung.png")
-        bm3d_path = os.path.join(phase1_folder, base_name + "_bm3d_lung.png")
+        bil_path  = os.path.join(patient_phase1_path, base_name + "_bilateral_lung.png")
+        nlm_path  = os.path.join(patient_phase1_path, base_name + "_nlm_lung.png")
+        bm3d_path = os.path.join(patient_phase1_path, base_name + "_bm3d_lung.png")
 
         if not all(os.path.exists(p) for p in 
-                   [ldct_path, enh_path, mask_path, bil_path, nlm_path, bm3d_path]):
+                   [ndct_path, ldct_path, enh_path, mask_path, bil_path, nlm_path, bm3d_path]):
             continue
 
         ndct = load_image(ndct_path)
@@ -95,14 +90,15 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         ):
             psnr = compute_psnr(ndct, img, mask)
             ssim = compute_ssim(ndct, img, mask)
+
             if psnr is not None:
                 results[name].append(psnr)
                 ssim_results[name].append(ssim)
 
-print("\n===== Phase 1 Lung-Focused Comparison (8 Patients) =====\n")
+print("\n===== Phase 1 (STRICT 8 Patients) =====\n")
 
 for method in results.keys():
-    print(f"{method}")
+    print(method)
     print(f"  PSNR: {np.mean(results[method]):.3f} ± {np.std(results[method]):.3f}")
     print(f"  SSIM: {np.mean(ssim_results[method]):.4f} ± {np.std(ssim_results[method]):.4f}")
     print()
