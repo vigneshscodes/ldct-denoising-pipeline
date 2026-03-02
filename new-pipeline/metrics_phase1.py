@@ -4,17 +4,20 @@ import numpy as np
 import pandas as pd
 from skimage.metrics import structural_similarity
 
+# ============================
+# ROOT PATHS
+# ============================
+
 LDCT_ROOT = r"D:\CT_Datasets\LDCT"
-ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
+ENH_ROOT = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
-PATIENT_BASE = os.path.join(
-    PHASE1_ROOT,
-    "manifest-1770741989405",
-    "LIDC-IDRI"
-)
 
 OUTPUT_CSV = "phase1_comparison_8patients.csv"
 MAX_PATIENTS = 8
+
+# ============================
+# Utility
+# ============================
 
 def load_image(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
@@ -23,15 +26,38 @@ def load_image(path):
 def compute_psnr(gt, pred, mask):
     gt_lung = gt[mask == 1]
     pred_lung = pred[mask == 1]
+
     if len(gt_lung) == 0:
         return None
+
     mse = np.mean((gt_lung - pred_lung) ** 2)
     if mse == 0:
         return 100.0
+
     return 10 * np.log10(1.0 / mse)
 
 def compute_ssim(gt, pred, mask):
     return structural_similarity(gt * mask, pred * mask, data_range=1.0)
+
+# ============================
+# Collect first 8 patients
+# ============================
+
+patient_ids = set()
+
+for root, dirs, files in os.walk(PHASE1_ROOT):
+    for d in dirs:
+        if d.startswith("LIDC-IDRI-"):
+            patient_ids.add(d)
+
+patient_ids = sorted(list(patient_ids))[:MAX_PATIENTS]
+
+print("\nEvaluating STRICT patients:")
+print(patient_ids)
+
+# ============================
+# Storage
+# ============================
 
 results = {
     "LDCT": [],
@@ -43,41 +69,43 @@ results = {
 
 ssim_results = {k: [] for k in results.keys()}
 
-# 🔒 STRICT: Only look at Phase1 folders
-patient_folders = sorted([
-    f for f in os.listdir(PATIENT_BASE)
-    if f.startswith("LIDC-IDRI-")
-])[:MAX_PATIENTS]
+# ============================
+# MAIN EVALUATION
+# ============================
 
-print("Evaluating ONLY these patients:", patient_folders)
+for root, dirs, files in os.walk(PHASE1_ROOT):
 
-print("Evaluating ONLY these patients:")
-print(patient_folders)
-
-for patient_id in patient_folders:
-
-    patient_ldct_path = os.path.join(LDCT_ROOT, patient_id)
-    patient_enh_path  = os.path.join(ENH_ROOT, patient_id)
-    patient_phase1_path = os.path.join(PHASE1_ROOT, patient_id)
-
-    if not os.path.isdir(patient_phase1_path):
-        continue
-
-    for file in os.listdir(patient_phase1_path):
+    for file in files:
 
         if not file.endswith("_bilateral_lung.png"):
             continue
 
+        # Identify patient ID from path
+        patient_id = None
+        for pid in patient_ids:
+            if pid in root:
+                patient_id = pid
+                break
+
+        if patient_id is None:
+            continue  # Skip if not in selected 8 patients
+
         base_name = file.replace("_bilateral_lung.png", "")
 
-        ndct_path = os.path.join(patient_ldct_path, base_name + "_ndct.png")
-        ldct_path = os.path.join(patient_ldct_path, base_name + "_ldct.png")
-        enh_path  = os.path.join(patient_enh_path, base_name + "_enhanced.png")
-        mask_path = os.path.join(patient_enh_path, base_name + "_lung_mask.png")
+        # Build corresponding paths (mirror structure)
+        relative_path = os.path.relpath(root, PHASE1_ROOT)
 
-        bil_path  = os.path.join(patient_phase1_path, base_name + "_bilateral_lung.png")
-        nlm_path  = os.path.join(patient_phase1_path, base_name + "_nlm_lung.png")
-        bm3d_path = os.path.join(patient_phase1_path, base_name + "_bm3d_lung.png")
+        ldct_folder = os.path.join(LDCT_ROOT, relative_path)
+        enh_folder = os.path.join(ENH_ROOT, relative_path)
+
+        ndct_path = os.path.join(ldct_folder, base_name + "_ndct.png")
+        ldct_path = os.path.join(ldct_folder, base_name + "_ldct.png")
+        enh_path  = os.path.join(enh_folder, base_name + "_enhanced.png")
+        mask_path = os.path.join(enh_folder, base_name + "_lung_mask.png")
+
+        bil_path  = os.path.join(root, base_name + "_bilateral_lung.png")
+        nlm_path  = os.path.join(root, base_name + "_nlm_lung.png")
+        bm3d_path = os.path.join(root, base_name + "_bm3d_lung.png")
 
         if not all(os.path.exists(p) for p in 
                    [ndct_path, ldct_path, enh_path, mask_path, bil_path, nlm_path, bm3d_path]):
@@ -91,6 +119,7 @@ for patient_id in patient_folders:
         bm3d_img = load_image(bm3d_path)
         mask = (load_image(mask_path) > 0.5).astype(np.uint8)
 
+        # Skip small lung slices
         if np.sum(mask) / mask.size < 0.05:
             continue
 
@@ -105,9 +134,17 @@ for patient_id in patient_folders:
                 results[name].append(psnr)
                 ssim_results[name].append(ssim)
 
+# ============================
+# FINAL RESULTS
+# ============================
+
 print("\n===== Phase 1 (STRICT 8 Patients) =====\n")
 
 for method in results.keys():
+    if len(results[method]) == 0:
+        print(f"{method}: No valid slices found\n")
+        continue
+
     print(method)
     print(f"  PSNR: {np.mean(results[method]):.3f} ± {np.std(results[method]):.3f}")
     print(f"  SSIM: {np.mean(ssim_results[method]):.4f} ± {np.std(ssim_results[method]):.4f}")
@@ -120,4 +157,5 @@ df = pd.DataFrame({
 })
 
 df.to_csv(OUTPUT_CSV, index=False)
+
 print(f"Saved results to {OUTPUT_CSV}")
