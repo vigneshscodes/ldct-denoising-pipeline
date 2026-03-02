@@ -33,7 +33,7 @@ def save_image(img, path):
 def apply_bilateral(img):
     out = cv2.bilateralFilter(
         (img * 255).astype(np.uint8),
-        d=7,               # weaker than Phase1
+        d=7,
         sigmaColor=40,
         sigmaSpace=40
     )
@@ -42,7 +42,7 @@ def apply_bilateral(img):
 def apply_nlm(img):
     out = denoise_nl_means(
         img,
-        h=0.10,            # slightly stronger
+        h=0.10,
         fast_mode=True,
         patch_size=5,
         patch_distance=6
@@ -58,7 +58,7 @@ def apply_bm3d(img):
 # ============================
 
 processed_patients = set()
-
+print("\nSelected Patients (Phase 2):")
 for root, dirs, files in os.walk(ENH_ROOT):
 
     relative_path = os.path.relpath(root, ENH_ROOT)
@@ -66,7 +66,6 @@ for root, dirs, files in os.walk(ENH_ROOT):
     if relative_path == ".":
         continue
 
-    # Identify patient ID from path
     patient_id = None
     for part in relative_path.split(os.sep):
         if part.startswith("LIDC-IDRI-"):
@@ -80,6 +79,7 @@ for root, dirs, files in os.walk(ENH_ROOT):
         if len(processed_patients) >= MAX_PATIENTS:
             break
         processed_patients.add(patient_id)
+        print(patient_id)
 
     for file in files:
 
@@ -98,13 +98,15 @@ for root, dirs, files in os.walk(ENH_ROOT):
 
         print(f"Processing {base_name}")
 
-        # Load images
         img = load_image(enhanced_path)
         lung_mask = (load_image(lung_path) > 0.5).astype(np.float32)
         bone_mask = (load_image(bone_path) > 0.5).astype(np.float32)
         soft_mask = (load_image(soft_path) > 0.5).astype(np.float32)
 
-        # Sanity: remove overlaps
+        # ✅ Added: 5% lung slice filter (same as Phase 1)
+        if np.sum(lung_mask) / lung_mask.size < 0.05:
+            continue
+
         # Ensure exclusive masks
         bone_mask = bone_mask * (1 - lung_mask)
         soft_mask = soft_mask * (1 - lung_mask) * (1 - bone_mask)
@@ -114,7 +116,6 @@ for root, dirs, files in os.walk(ENH_ROOT):
         I_nlm = apply_nlm(img)
         I_bm3d = apply_bm3d(img)
 
-        # Region-Adaptive Blending
         mask_sum = lung_mask + bone_mask + soft_mask
 
         I_region = (
@@ -124,7 +125,6 @@ for root, dirs, files in os.walk(ENH_ROOT):
             (1 - mask_sum) * img
         )
 
-        # Save output
         save_path = os.path.join(
             PHASE2_ROOT,
             relative_path,
