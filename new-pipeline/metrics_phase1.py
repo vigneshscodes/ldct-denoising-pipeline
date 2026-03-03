@@ -138,7 +138,7 @@ for root, dirs, files in os.walk(PHASE1_ROOT):
 # FINAL RESULTS
 # ============================
 
-print("\n===== Phase 1 (STRICT 8 Patients) =====\n")
+print("\n===== Phase 1 =====\n")
 
 for method in results.keys():
     if len(results[method]) == 0:
