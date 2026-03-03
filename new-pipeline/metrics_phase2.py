@@ -12,8 +12,8 @@ LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 ENH_ROOT = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE2_ROOT = r"D:\CT_Datasets\Phase2_RegionAdaptive"
 
-OUTPUT_CSV = "phase2_region_adaptive_metrics.csv"
-MAX_PATIENTS = 8
+OUTPUT_CSV = "phase2_region_adaptive_metrics_20patients.csv"
+MAX_PATIENTS = 20
 
 # ============================
 # Utility
