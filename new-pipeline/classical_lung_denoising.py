@@ -57,16 +57,30 @@ def apply_bm3d(img):
     return bm3d_out.astype(np.float32)
 
 # ----------------------------
-# MAIN LOOP (PATIENT LIMITED)
+# MAIN LOOP (DETERMINISTIC 9–20)
 # ----------------------------
 
-processed_patients = set()
+# Step 1: Collect all patient IDs first
+all_patients = set()
 
 for root, dirs, files in os.walk(LDCT_ROOT):
+    parts = root.split(os.sep)
+    for part in parts:
+        if part.startswith("LIDC-IDRI-"):
+            all_patients.add(part)
 
-    # Identify patient folder by relative path
+# Step 2: Sort them properly
+all_patients = sorted(all_patients)
+
+# Step 3: Select strictly 9–20
+selected_patients = all_patients[START_INDEX:END_INDEX]
+
+print("Selected patients:", selected_patients)
+
+# Step 4: Process only selected patients
+for root, dirs, files in os.walk(LDCT_ROOT):
+
     relative_path = os.path.relpath(root, LDCT_ROOT)
-
     if relative_path == ".":
         continue
 
@@ -77,20 +91,9 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         if part.startswith("LIDC-IDRI-"):
             patient_id = part
             break
-    if patient_id is None:
+
+    if patient_id is None or patient_id not in selected_patients:
         continue
-
-    if patient_id not in processed_patients:
-        processed_patients.add(patient_id)
-
-        patient_number = len(processed_patients)
-
-        if patient_number <= START_INDEX:
-            continue
-
-        if patient_number > END_INDEX:
-            break
-        print("Now processing patient:", patient_id)
 
     for file in files:
 
@@ -115,7 +118,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
 
-        print(f"Processing {base_name}")
+        print(f"Processing {patient_id} → {base_name}")
 
         bilateral = apply_bilateral(img)
         nlm       = apply_nlm(img)
