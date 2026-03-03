@@ -12,8 +12,8 @@ LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 ENH_ROOT = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
 
-OUTPUT_CSV = "phase1_comparison_8patients.csv"
-MAX_PATIENTS = 8
+OUTPUT_CSV = "phase1_comparison_20patients.csv"
+MAX_PATIENTS = 20
 
 # ============================
 # Utility
