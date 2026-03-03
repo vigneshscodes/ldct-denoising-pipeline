@@ -12,6 +12,8 @@ ENH_ROOT  = r"D:\CT_Datasets\LDCT_Enhanced"
 PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
 
 MAX_PATIENTS = 8   # ✅ LIMIT HERE
+START_INDEX = 8    # skip first 8
+END_INDEX   = 20   # stop at 20
 
 # ----------------------------
 # Utility Functions
@@ -71,9 +73,16 @@ for root, dirs, files in os.walk(LDCT_ROOT):
     patient_id = relative_path.split(os.sep)[0]
 
     if patient_id not in processed_patients:
-        if len(processed_patients) >= MAX_PATIENTS:
-            break
         processed_patients.add(patient_id)
+
+        patient_number = len(processed_patients)
+
+        if patient_number <= START_INDEX:
+            continue
+
+        if patient_number > END_INDEX:
+            break
+        print("Now processing patient:", patient_id)
 
     for file in files:
 
