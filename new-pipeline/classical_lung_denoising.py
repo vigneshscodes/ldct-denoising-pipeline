@@ -70,7 +70,15 @@ for root, dirs, files in os.walk(LDCT_ROOT):
     if relative_path == ".":
         continue
 
-    patient_id = relative_path.split(os.sep)[0]
+    parts = relative_path.split(os.sep)
+    patient_id = None
+
+    for part in parts:
+        if part.startswith("LIDC-IDRI-"):
+            patient_id = part
+            break
+    if patient_id is None:
+        continue
 
     if patient_id not in processed_patients:
         processed_patients.add(patient_id)
