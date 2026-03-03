@@ -54,15 +54,33 @@ def apply_bm3d(img):
     return out.astype(np.float32)
 
 # ============================
-# MAIN LOOP
+# MAIN LOOP (STRICT 9–20)
 # ============================
 
-processed_patients = set()
+# Step 1: Collect all patient IDs first
+all_patients = set()
+
+for root, dirs, files in os.walk(ENH_ROOT):
+    parts = root.split(os.sep)
+    for part in parts:
+        if part.startswith("LIDC-IDRI-"):
+            all_patients.add(part)
+
+# Step 2: Sort them
+all_patients = sorted(all_patients)
+
+# Step 3: Select strictly patients 9–20
+START_INDEX = 8
+END_INDEX = 20
+selected_patients = all_patients[START_INDEX:END_INDEX]
+
 print("\nSelected Patients (Phase 2):")
+print(selected_patients)
+
+# Step 4: Process only selected patients
 for root, dirs, files in os.walk(ENH_ROOT):
 
     relative_path = os.path.relpath(root, ENH_ROOT)
-
     if relative_path == ".":
         continue
 
@@ -72,14 +90,8 @@ for root, dirs, files in os.walk(ENH_ROOT):
             patient_id = part
             break
 
-    if patient_id is None:
+    if patient_id is None or patient_id not in selected_patients:
         continue
-
-    if patient_id not in processed_patients:
-        if len(processed_patients) >= MAX_PATIENTS:
-            break
-        processed_patients.add(patient_id)
-        print(patient_id)
 
     for file in files:
 
@@ -96,14 +108,14 @@ for root, dirs, files in os.walk(ENH_ROOT):
         if not all(os.path.exists(p) for p in [lung_path, bone_path, soft_path]):
             continue
 
-        print(f"Processing {base_name}")
+        print(f"Processing {patient_id} → {base_name}")
 
         img = load_image(enhanced_path)
         lung_mask = (load_image(lung_path) > 0.5).astype(np.float32)
         bone_mask = (load_image(bone_path) > 0.5).astype(np.float32)
         soft_mask = (load_image(soft_path) > 0.5).astype(np.float32)
 
-        # ✅ Added: 5% lung slice filter (same as Phase 1)
+        # 5% lung filter (unchanged)
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
 
