@@ -18,7 +18,7 @@ from segmentation import (
 # --------------------------
 # CONFIGURE PATHS HERE
 # --------------------------
-INPUT_ROOT  = r"D:\CT_Datasets\NDCT"
+INPUT_ROOT  = r"D:\CT_Datasets\NDCT_Eval"
 LDCT_ROOT   = r"D:\CT_Datasets\LDCT"
 ENH_ROOT    = r"D:\CT_Datasets\LDCT_Enhanced"
 
