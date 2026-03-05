@@ -16,13 +16,9 @@ OUTPUT_ROOT = r"D:\CT_Datasets\CNN_Dataset_PatientWise"
 
 TRAIN_INPUT = os.path.join(OUTPUT_ROOT, "train_inputs")
 TRAIN_TARGET = os.path.join(OUTPUT_ROOT, "train_targets")
-TEST_INPUT = os.path.join(OUTPUT_ROOT, "test_inputs")
-TEST_TARGET = os.path.join(OUTPUT_ROOT, "test_targets")
 
 os.makedirs(TRAIN_INPUT, exist_ok=True)
 os.makedirs(TRAIN_TARGET, exist_ok=True)
-os.makedirs(TEST_INPUT, exist_ok=True)
-os.makedirs(TEST_TARGET, exist_ok=True)
 
 
 # ==========================
@@ -32,10 +28,7 @@ os.makedirs(TEST_TARGET, exist_ok=True)
 TRAIN_PATIENTS = [
 "LIDC-IDRI-0001","LIDC-IDRI-0002","LIDC-IDRI-0003","LIDC-IDRI-0004","LIDC-IDRI-0005",
 "LIDC-IDRI-0006","LIDC-IDRI-0007","LIDC-IDRI-0008","LIDC-IDRI-0009","LIDC-IDRI-0010",
-"LIDC-IDRI-0011","LIDC-IDRI-0012","LIDC-IDRI-0013","LIDC-IDRI-0014","LIDC-IDRI-0015"
-]
-
-TEST_PATIENTS = [
+"LIDC-IDRI-0011","LIDC-IDRI-0012","LIDC-IDRI-0013","LIDC-IDRI-0014","LIDC-IDRI-0015",
 "LIDC-IDRI-0016","LIDC-IDRI-0017","LIDC-IDRI-0018","LIDC-IDRI-0019","LIDC-IDRI-0020"
 ]
 
@@ -135,11 +128,6 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 
             np.save(os.path.join(TRAIN_INPUT, sample_name), input_tensor)
             np.save(os.path.join(TRAIN_TARGET, sample_name), target_tensor)
-
-        elif patient_id in TEST_PATIENTS:
-
-            np.save(os.path.join(TEST_INPUT, sample_name), input_tensor)
-            np.save(os.path.join(TEST_TARGET, sample_name), target_tensor)
 
 
         sample_index += 1
