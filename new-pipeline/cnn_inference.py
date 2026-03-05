@@ -19,6 +19,20 @@ OUTPUT_ROOT = r"D:\CT_Datasets\Phase3_CNN_Refined"
 
 
 # ==============================
+# EVALUATION PATIENTS
+# ==============================
+
+EVAL_PATIENTS = [
+"LIDC-IDRI-0021",
+"LIDC-IDRI-0022",
+"LIDC-IDRI-0023",
+"LIDC-IDRI-0024",
+"LIDC-IDRI-0025",
+"LIDC-IDRI-0026"
+]
+
+
+# ==============================
 # MODEL DEFINITION
 # ==============================
 
@@ -63,9 +77,11 @@ def load_image(path):
 
 
 def save_image(img, path):
+
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
     img_uint8 = np.clip(img * 255, 0, 255).astype(np.uint8)
+
     cv2.imwrite(path, img_uint8)
 
 
@@ -76,6 +92,19 @@ def save_image(img, path):
 for root, dirs, files in os.walk(REGION_ROOT):
 
     relative = os.path.relpath(root, REGION_ROOT)
+
+    # detect patient
+    patient_id = None
+
+    for part in relative.split(os.sep):
+        if part.startswith("LIDC-IDRI-"):
+            patient_id = part
+            break
+
+    # skip training patients
+    if patient_id not in EVAL_PATIENTS:
+        continue
+
 
     for file in files:
 
@@ -130,4 +159,5 @@ for root, dirs, files in os.walk(REGION_ROOT):
 
         print("Saved:", save_path)
 
-print("CNN inference completed.")
+
+print("\nCNN inference for evaluation patients completed.")
