@@ -76,7 +76,8 @@ results = {
 "NLM_Lung": [],
 "BM3D_Lung": [],
 "Region_Adaptive": [],
-"CNN_Refined": []
+"CNN_Validation": [],
+"CNN_Test": []
 }
 
 ssim_results = {k: [] for k in results.keys()}
@@ -113,7 +114,6 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         bm3d_path = os.path.join(phase1_folder,base+"_bm3d_lung.png")
 
         region_path = os.path.join(phase2_folder,base+"_region_adaptive.png")
-
         cnn_path = os.path.join(cnn_folder,base+"_cnn_refined.png")
 
         if not os.path.exists(mask_path):
@@ -203,18 +203,23 @@ for root, dirs, files in os.walk(LDCT_ROOT):
                 patient_id = part
                 break
 
-        if patient_id in VALIDATION_PATIENTS + TEST_PATIENTS:
 
-            if os.path.exists(cnn_path):
+        if os.path.exists(cnn_path):
 
-                cnn = load_image(cnn_path)
+            cnn = load_image(cnn_path)
 
-                psnr = compute_psnr(ndct,cnn,mask)
-                ssim = compute_ssim(ndct,cnn,mask)
+            psnr = compute_psnr(ndct,cnn,mask)
+            ssim = compute_ssim(ndct,cnn,mask)
 
-                if psnr is not None:
-                    results["CNN_Refined"].append(psnr)
-                    ssim_results["CNN_Refined"].append(ssim)
+            if psnr is not None:
+
+                if patient_id in VALIDATION_PATIENTS:
+                    results["CNN_Validation"].append(psnr)
+                    ssim_results["CNN_Validation"].append(ssim)
+
+                if patient_id in TEST_PATIENTS:
+                    results["CNN_Test"].append(psnr)
+                    ssim_results["CNN_Test"].append(ssim)
 
 
 # =========================================================
