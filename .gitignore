@@ -1,14 +1,27 @@
 # datasets
 data/
+CT_Datasets/
 
 # models
 *.pth
+*.pt
 
 # python cache
 __pycache__/
 *.pyc
+*.pyo
+
+# environments
+.env
+venv/
+.venv/
 
 # vscode
 .vscode/
 
-.env
+# jupyter
+.ipynb_checkpoints/
+
+# system files
+.DS_Store
+Thumbs.db
