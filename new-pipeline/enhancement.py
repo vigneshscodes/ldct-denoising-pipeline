@@ -69,13 +69,16 @@ def apply_clahe(img_norm,
 # ---------------------------------
 def enhance_ldct(img_norm):
 
-    # Step 1: Wavelet denoising
-    wavelet_img = wavelet_denoise(img_norm)
+    wavelet_img = wavelet_denoise(img_norm, level=1)
 
-    # Step 2: ADD smoothing (CRITICAL)
+    # CRITICAL STEP
     wavelet_img = cv2.GaussianBlur(wavelet_img, (3,3), 0)
 
-    # Step 3: Use SAFE CLAHE (NO OVERRIDE)
-    enhanced_img = apply_clahe(wavelet_img)
+    enhanced_img = apply_clahe(
+        wavelet_img,
+        clip_limit=1.2,
+        tile_grid_size=(16, 16),
+        blend_factor=0.12
+    )
 
     return enhanced_img
