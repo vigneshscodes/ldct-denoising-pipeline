@@ -53,9 +53,9 @@ def wavelet_denoise(img_norm, wavelet='db1', level=2):
 # Controlled CLAHE
 # ---------------------------------
 def apply_clahe(img_norm,
-                clip_limit=2.0,
-                tile_grid_size=(8, 8),
-                blend_factor=0.4):
+                clip_limit=1.5,
+                tile_grid_size=(16, 16),
+                blend_factor=0.25):
     """
     CLAHE with blending to avoid over-amplification.
     blend_factor: 0 = no CLAHE, 1 = full CLAHE
