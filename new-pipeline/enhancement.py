@@ -69,13 +69,18 @@ def apply_clahe(img_norm,
 # ---------------------------------
 def enhance_ldct(img_norm):
 
-    #  VERY IMPORTANT CHANGE
-    # Reduce wavelet strength
+    # Step 1: Light wavelet
     wavelet_img = wavelet_denoise(img_norm, level=1)
 
-    #  NO GAUSSIAN BLUR (keep removed)
+    # ADD THIS (edge-preserving smoothing)
+    wavelet_img = cv2.bilateralFilter(
+        (wavelet_img * 255).astype(np.uint8),
+        d=3,
+        sigmaColor=20,
+        sigmaSpace=20
+    ).astype(np.float32) / 255.0
 
-    # Slightly stronger CLAHE
+    # Step 2: CLAHE
     enhanced_img = apply_clahe(
         wavelet_img,
         clip_limit=2.0,
