@@ -69,16 +69,18 @@ def apply_clahe(img_norm,
 # ---------------------------------
 def enhance_ldct(img_norm):
 
+    #  VERY IMPORTANT CHANGE
+    # Reduce wavelet strength
     wavelet_img = wavelet_denoise(img_norm, level=1)
 
-    # CRITICAL STEP
-    wavelet_img = cv2.GaussianBlur(wavelet_img, (3,3), 0)
+    #  NO GAUSSIAN BLUR (keep removed)
 
+    # Slightly stronger CLAHE
     enhanced_img = apply_clahe(
         wavelet_img,
-        clip_limit=1.2,
+        clip_limit=2.0,
         tile_grid_size=(16, 16),
-        blend_factor=0.12
+        blend_factor=0.3
     )
 
     return enhanced_img
