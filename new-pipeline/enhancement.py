@@ -16,11 +16,11 @@ def estimate_noise(img_norm):
 # ---------------------------------
 # Adaptive Wavelet Denoising
 # ---------------------------------
-def wavelet_denoise(img_norm, wavelet='db1', level=2):
+def wavelet_denoise(img_norm, wavelet='db1', level=1):
 
     sigma = estimate_noise(img_norm)
 
-    threshold = sigma * np.sqrt(2 * np.log(img_norm.size))
+    threshold = 0.6 * sigma * np.sqrt(2 * np.log(img_norm.size))
 
     coeffs = pywt.wavedec2(img_norm, wavelet, level=level)
 
@@ -35,9 +35,7 @@ def wavelet_denoise(img_norm, wavelet='db1', level=2):
         ))
 
     denoised = pywt.waverec2(coeffs_thresh, wavelet)
-    denoised = np.clip(denoised, 0, 1)
-
-    return denoised
+    return np.clip(denoised, 0, 1)
 
 
 # ---------------------------------
@@ -69,18 +67,8 @@ def apply_clahe(img_norm,
 # ---------------------------------
 def enhance_ldct(img_norm):
 
-    # Step 1: Light wavelet
     wavelet_img = wavelet_denoise(img_norm, level=1)
 
-    # ADD THIS (edge-preserving smoothing)
-    wavelet_img = cv2.bilateralFilter(
-        (wavelet_img * 255).astype(np.uint8),
-        d=3,
-        sigmaColor=20,
-        sigmaSpace=20
-    ).astype(np.float32) / 255.0
-
-    # Step 2: CLAHE
     enhanced_img = apply_clahe(
         wavelet_img,
         clip_limit=2.0,
