@@ -142,7 +142,7 @@ for INPUT_ROOT in INPUT_ROOTS:
             # REGION MASKS FROM ORIGINAL HU
             # --------------------------
             bone_mask = create_bone_mask(img_hu)
-            body_mask = (img_hu > -500).astype(np.uint8)
+            body_mask = (img_hu > -700).astype(np.uint8)
 
             # --------------------------
             # STEP 2: Apply Lung Window
@@ -167,7 +167,7 @@ for INPUT_ROOT in INPUT_ROOTS:
             # --------------------------
             # STEP 5: Lung Segmentation (FIXED INPUT)
             # --------------------------
-            lung_prob = predict_lung_mask(seg_model, enhanced_norm)
+            lung_prob = predict_lung_mask(seg_model, ldct_norm)
             lung_mask = postprocess_lung_mask(lung_prob)
 
             lung_percent = np.sum(lung_mask) / lung_mask.size * 100
