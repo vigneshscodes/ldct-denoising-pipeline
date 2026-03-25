@@ -20,7 +20,7 @@ def wavelet_denoise(img_norm, wavelet='db1', level=1):
 
     sigma = estimate_noise(img_norm)
 
-    threshold = 0.6 * sigma * np.sqrt(2 * np.log(img_norm.size))
+    threshold = 0.8 * sigma * np.sqrt(2 * np.log(img_norm.size))
 
     coeffs = pywt.wavedec2(img_norm, wavelet, level=level)
 
@@ -67,13 +67,14 @@ def apply_clahe(img_norm,
 # ---------------------------------
 def enhance_ldct(img_norm):
 
+    # Slightly stronger denoising
     wavelet_img = wavelet_denoise(img_norm, level=1)
 
     enhanced_img = apply_clahe(
         wavelet_img,
-        clip_limit=2.0,
+        clip_limit=1.6,
         tile_grid_size=(16, 16),
-        blend_factor=0.3
+        blend_factor=0.22
     )
 
     return enhanced_img
