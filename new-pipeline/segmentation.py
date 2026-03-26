@@ -76,23 +76,23 @@ def predict_lung_mask(model, img_norm):
 # ------------------------------
 # Postprocess Lung Mask (IMPROVED BUT SAFE)
 # ------------------------------
-def postprocess_lung_mask(lung_prob, threshold=0.5):
+def postprocess_lung_mask(lung_prob):
 
-    lung_mask = (lung_prob > threshold).astype(np.uint8)
+    # lower threshold (key fix)
+    lung_mask = (lung_prob > 0.3).astype(np.uint8)
 
-    # Morphological cleanup
     kernel = np.ones((5, 5), np.uint8)
-    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
-    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
 
-    #  ADD THIS (IMPORTANT FIX)
-    lung_mask = cv2.medianBlur(lung_mask, 5)
-
-    kernel = np.ones((7, 7), np.uint8)
+    # expand region
     lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
 
-    return lung_mask
+    # fill gaps
+    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
 
+    # remove noise
+    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
+
+    return lung_mask
 
 # ------------------------------
 # Bone Mask from HU (STABLE VERSION)
