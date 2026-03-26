@@ -1,5 +1,5 @@
 # ============================
-# REGION-WISE DENOISING (FINAL 100/100)
+# REGION-WISE DENOISING (FINAL 100/100 FIXED)
 # ============================
 
 import os
@@ -20,7 +20,6 @@ EVAL_PATIENT = "LIDC-IDRI-0001"
 
 os.makedirs(PHASE2_ROOT, exist_ok=True)
 
-
 # ============================
 # Utility
 # ============================
@@ -37,18 +36,17 @@ def save_image(img, path):
     img_uint8 = np.clip(img * 255, 0, 255).astype(np.uint8)
     cv2.imwrite(path, img_uint8)
 
-
 # ============================
-# Classical Filters (TUNED)
+# Classical Filters (STRONG + BALANCED)
 # ============================
 
 def apply_bilateral(img):
-    #  Stronger for lung
+    # Stronger smoothing for lung
     out = cv2.bilateralFilter(
         (img * 255).astype(np.uint8),
         d=9,
-        sigmaColor=60,
-        sigmaSpace=60
+        sigmaColor=70,   # ↑ increased
+        sigmaSpace=70
     )
     return out.astype(np.float32) / 255.0
 
@@ -56,7 +54,7 @@ def apply_bilateral(img):
 def apply_nlm(img):
     return denoise_nl_means(
         img,
-        h=0.12,   # slightly stronger
+        h=0.12,
         fast_mode=True,
         patch_size=5,
         patch_distance=6
@@ -64,9 +62,8 @@ def apply_nlm(img):
 
 
 def apply_bm3d(img):
-    #  Stronger BM3D (key improvement)
-    return bm3d(img, sigma_psd=0.05).astype(np.float32)
-
+    # 🔥 Stronger BM3D (KEY FIX)
+    return bm3d(img, sigma_psd=0.07).astype(np.float32)
 
 # ============================
 # MAIN LOOP
@@ -80,7 +77,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
     relative_path = os.path.relpath(root, LDCT_ROOT)
     seg_root = os.path.join(SEG_ROOT, relative_path)
 
-    #  SORT FILES (correct order)
+    # SORT FILES CORRECTLY
     ldct_files = [f for f in files if f.endswith("_ldct.png")]
     ldct_files = sorted(
         ldct_files,
@@ -134,7 +131,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         I_bilateral = apply_bilateral(img)
         I_nlm = apply_nlm(img)
 
-        #  BM3D optimization (keep)
+        # BM3D optimization (keep)
         if np.sum(soft_mask) / soft_mask.size < 0.02:
             I_bm3d = img
         else:
@@ -143,14 +140,17 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         mask_sum = lung_mask + bone_mask + soft_mask
 
         # --------------------------
-        #  IMPROVED REGION FUSION (CRITICAL)
+        # 🔥 FINAL FUSION (FIXED)
         # --------------------------
         I_region = (
-            lung_mask * (0.7 * I_bilateral + 0.3 * img) +
+            lung_mask * (0.6 * I_bilateral + 0.4 * img) +
             bone_mask * I_nlm +
-            soft_mask * (0.8 * I_bm3d + 0.2 * img) +
+            soft_mask * (0.9 * I_bm3d + 0.1 * img) +
             (1 - mask_sum) * img
         )
+
+        # 🔥 FINAL SMOOTHING (IMPORTANT)
+        I_region = cv2.GaussianBlur(I_region, (3, 3), 0.5)
 
         save_path = os.path.join(
             PHASE2_ROOT,
@@ -160,4 +160,4 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 
         save_image(I_region, save_path)
 
-print("\nDone: Region-wise denoising completed")
+print("\n✅ DONE: Region-wise denoising completed")
