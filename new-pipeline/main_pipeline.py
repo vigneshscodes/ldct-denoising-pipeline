@@ -21,8 +21,10 @@ INPUT_ROOTS = [
 ]
 
 LDCT_ROOT = r"D:\CT_Datasets\LDCT"
+SEG_ROOT  = r"D:\CT_Datasets\Segmentation"
 
 os.makedirs(LDCT_ROOT, exist_ok=True)
+os.makedirs(SEG_ROOT, exist_ok=True)
 
 # --------------------------
 # PATIENT SPLITS
@@ -48,7 +50,6 @@ ALL_PATIENTS = TRAIN_PATIENTS + VAL_PATIENTS + TEST_PATIENTS
 # Utility Functions
 # --------------------------
 def save_dicom(original_ds, new_hu_img, save_path):
-
     ds_copy = original_ds.copy()
 
     slope = getattr(ds_copy, "RescaleSlope", 1)
@@ -81,9 +82,7 @@ print("Segmentation model loaded successfully.")
 for INPUT_ROOT in INPUT_ROOTS:
     for root, dirs, files in os.walk(INPUT_ROOT):
 
-        # --------------------------
         # Detect patient ID
-        # --------------------------
         patient_id = None
         for part in root.split(os.sep):
             if part.startswith("LIDC-IDRI-"):
@@ -93,9 +92,7 @@ for INPUT_ROOT in INPUT_ROOTS:
         if patient_id is None or patient_id not in ALL_PATIENTS:
             continue
 
-        # --------------------------
         # Assign split
-        # --------------------------
         if patient_id in TRAIN_PATIENTS:
             split = "train"
         elif patient_id in VAL_PATIENTS:
@@ -105,9 +102,6 @@ for INPUT_ROOT in INPUT_ROOTS:
         else:
             continue
 
-        # --------------------------
-        # Loop through files
-        # --------------------------
         for file in files:
 
             if not file.lower().endswith(".dcm"):
@@ -118,26 +112,29 @@ for INPUT_ROOT in INPUT_ROOTS:
             relative_subpath = os.path.relpath(root, INPUT_ROOT)
             relative_path = os.path.join(split, relative_subpath)
 
+            # Separate folders
             ldct_folder = os.path.join(LDCT_ROOT, relative_path)
+            seg_folder  = os.path.join(SEG_ROOT, relative_path)
+
             os.makedirs(ldct_folder, exist_ok=True)
+            os.makedirs(seg_folder, exist_ok=True)
 
             ldct_path = os.path.join(ldct_folder, file)
-
             base_name = os.path.splitext(file)[0]
 
             # --------------------------
-            # STEP 1: Load NDCT (HU)
+            # STEP 1: Load NDCT
             # --------------------------
             ds, img_hu = load_dicom(input_path)
 
             # --------------------------
-            # STEP 2: Region masks from NDCT
+            # STEP 2: Region masks (from NDCT)
             # --------------------------
             bone_mask = create_bone_mask(img_hu)
             body_mask = (img_hu > -700).astype(np.uint8)
 
             # --------------------------
-            # STEP 3: Lung window + normalize
+            # STEP 3: Lung window
             # --------------------------
             img_norm, lower, upper = apply_lung_window(img_hu)
 
@@ -148,8 +145,12 @@ for INPUT_ROOT in INPUT_ROOTS:
 
             save_dicom(ds, ldct_hu, ldct_path)
 
+            # Save NDCT + LDCT PNGs
+            save_png(img_norm, os.path.join(ldct_folder, f"{base_name}_ndct.png"))
+            save_png(ldct_norm, os.path.join(ldct_folder, f"{base_name}_ldct.png"))
+
             # --------------------------
-            # STEP 5: Segmentation (ON LDCT)
+            # STEP 5: Segmentation (on LDCT)
             # --------------------------
             lung_prob = predict_lung_mask(seg_model, ldct_norm)
             lung_mask = postprocess_lung_mask(lung_prob)
@@ -163,11 +164,10 @@ for INPUT_ROOT in INPUT_ROOTS:
             soft_mask = create_soft_tissue_mask(body_mask, lung_mask, bone_mask)
 
             # --------------------------
-            # SAVE OUTPUTS (verification)
+            # SAVE SEGMENTATION OUTPUTS
             # --------------------------
-            save_png(ldct_norm, os.path.join(ldct_folder, f"{base_name}_ldct.png"))
-            save_png(lung_mask, os.path.join(ldct_folder, f"{base_name}_lung_mask.png"))
-            save_png(bone_mask, os.path.join(ldct_folder, f"{base_name}_bone_mask.png"))
-            save_png(soft_mask, os.path.join(ldct_folder, f"{base_name}_soft_mask.png"))
+            save_png(lung_mask, os.path.join(seg_folder, f"{base_name}_lung_mask.png"))
+            save_png(bone_mask, os.path.join(seg_folder, f"{base_name}_bone_mask.png"))
+            save_png(soft_mask, os.path.join(seg_folder, f"{base_name}_soft_mask.png"))
 
 print("Pipeline completed successfully.")

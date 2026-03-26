@@ -30,7 +30,7 @@ def load_segmentation_model(model_path):
 # ------------------------------
 def preprocess_for_model(img_norm):
 
-    img_3ch = np.stack([img_norm]*3, axis=-1).astype(np.float32)
+    img_3ch = np.stack([img_norm] * 3, axis=-1).astype(np.float32)
 
     img_resized = cv2.resize(img_3ch, (256, 256)).astype(np.float32)
 
@@ -57,13 +57,16 @@ def predict_lung_mask(model, img_norm):
     with torch.no_grad():
         output = model(input_tensor)
 
-    # ✅ FIX: use softmax (correct for multi-class)
-    probs = torch.softmax(output, dim=1)
+    # ✅ Correct activation for your model
+    probs = torch.sigmoid(output)
     probs = probs.squeeze().cpu().numpy()
 
-    # ✅ Using confirmed lung channel (0)
+    # ✅ You confirmed lung = channel 0
+    lung_prob = probs[0]
+
+    # ✅ Resize back to original size (IMPORTANT)
     lung_prob = cv2.resize(
-        probs[0],
+        lung_prob,
         (img_norm.shape[1], img_norm.shape[0]),
         interpolation=cv2.INTER_LINEAR
     )
@@ -72,38 +75,16 @@ def predict_lung_mask(model, img_norm):
 
 
 # ------------------------------
-# Keep Largest Connected Region
-# ------------------------------
-def keep_largest_component(mask):
-
-    num_labels, labels = cv2.connectedComponents(mask)
-
-    if num_labels <= 1:
-        return mask
-
-    largest_label = 1 + np.argmax([
-        np.sum(labels == i) for i in range(1, num_labels)
-    ])
-
-    cleaned = (labels == largest_label).astype(np.uint8)
-
-    return cleaned
-
-
-# ------------------------------
 # Postprocess Mask
 # ------------------------------
-def postprocess_lung_mask(lung_prob, threshold=0.4):
+def postprocess_lung_mask(lung_prob, threshold=0.5):
 
     lung_mask = (lung_prob > threshold).astype(np.uint8)
 
-    # Morphological cleanup
+    # Morphological cleanup only (SAFE)
     kernel = np.ones((5, 5), np.uint8)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
-
-    # ✅ FIX: remove small false regions
-    lung_mask = keep_largest_component(lung_mask)
 
     return lung_mask
 
