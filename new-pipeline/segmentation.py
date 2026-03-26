@@ -30,7 +30,7 @@ def load_segmentation_model(model_path):
 # ------------------------------
 def preprocess_for_model(img_norm):
 
-    img_3ch = np.stack([img_norm] * 3, axis=-1).astype(np.float32)
+    img_3ch = np.stack([img_norm]*3, axis=-1).astype(np.float32)
 
     img_resized = cv2.resize(img_3ch, (256, 256)).astype(np.float32)
 
@@ -60,8 +60,10 @@ def predict_lung_mask(model, img_norm):
     probs = torch.sigmoid(output)
     probs = probs.squeeze().cpu().numpy()
 
+    # Lung = channel 0
     lung_prob = probs[0]
 
+    # Resize back to original resolution
     lung_prob = cv2.resize(
         lung_prob,
         (img_norm.shape[1], img_norm.shape[0]),
@@ -72,42 +74,28 @@ def predict_lung_mask(model, img_norm):
 
 
 # ------------------------------
-# Postprocess Lung Mask
+# Postprocess Lung Mask (IMPROVED BUT SAFE)
 # ------------------------------
 def postprocess_lung_mask(lung_prob, threshold=0.5):
 
     lung_mask = (lung_prob > threshold).astype(np.uint8)
 
-    # Fill small holes (important)
+    # Fill small holes (important fix)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, np.ones((7,7), np.uint8))
 
-    # Remove noise
+    # Remove small noise
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
-
-    # Smooth edges
-    lung_mask = cv2.GaussianBlur(lung_mask.astype(np.float32), (5,5), 0)
-    lung_mask = (lung_mask > 0.5).astype(np.uint8)
 
     return lung_mask
 
 
 # ------------------------------
-# Bone Mask (FINAL FIX)
+# Bone Mask from HU (STABLE VERSION)
 # ------------------------------
-def create_bone_mask(img_hu):
+def create_bone_mask(img_hu, bone_threshold=300):
 
-    # tighter HU range (critical fix)
-    bone_mask = ((img_hu > 400) & (img_hu < 1500)).astype(np.uint8)
-
-    # remove noise
-    kernel = np.ones((3,3), np.uint8)
-    bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_OPEN, kernel)
-
-    # remove very small components
-    num_labels, labels = cv2.connectedComponents(bone_mask)
-    for i in range(1, num_labels):
-        if np.sum(labels == i) < 200:
-            bone_mask[labels == i] = 0
+    # Keep it simple and stable
+    bone_mask = (img_hu > bone_threshold).astype(np.uint8)
 
     return bone_mask
 
@@ -119,6 +107,7 @@ def create_soft_tissue_mask(body_mask, lung_mask, bone_mask):
 
     soft_mask = body_mask.copy()
 
+    # Remove lung + bone regions
     soft_mask[lung_mask == 1] = 0
     soft_mask[bone_mask == 1] = 0
 
