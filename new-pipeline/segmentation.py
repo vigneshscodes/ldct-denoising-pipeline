@@ -57,14 +57,11 @@ def predict_lung_mask(model, img_norm):
     with torch.no_grad():
         output = model(input_tensor)
 
-    # Multi-label → sigmoid
     probs = torch.sigmoid(output)
     probs = probs.squeeze().cpu().numpy()
 
-    # Lung = channel 0 (as you verified)
     lung_prob = probs[0]
 
-    # Resize back
     lung_prob = cv2.resize(
         lung_prob,
         (img_norm.shape[1], img_norm.shape[0]),
@@ -81,30 +78,36 @@ def postprocess_lung_mask(lung_prob, threshold=0.5):
 
     lung_mask = (lung_prob > threshold).astype(np.uint8)
 
-    # Morphological cleanup
-    kernel = np.ones((5, 5), np.uint8)
-    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
-    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
+    # Fill small holes (important)
+    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, np.ones((7,7), np.uint8))
 
-    # 🔥 Smooth edges (important)
-    lung_mask = cv2.GaussianBlur(lung_mask.astype(np.float32), (5, 5), 0)
+    # Remove noise
+    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+
+    # Smooth edges
+    lung_mask = cv2.GaussianBlur(lung_mask.astype(np.float32), (5,5), 0)
     lung_mask = (lung_mask > 0.5).astype(np.uint8)
 
     return lung_mask
 
 
 # ------------------------------
-# Bone Mask from HU (FIXED)
+# Bone Mask (FINAL FIX)
 # ------------------------------
 def create_bone_mask(img_hu):
 
-    # Better range for bone
-    bone_mask = ((img_hu > 300) & (img_hu < 2000)).astype(np.uint8)
+    # tighter HU range (critical fix)
+    bone_mask = ((img_hu > 400) & (img_hu < 1500)).astype(np.uint8)
 
-    # Clean noise
-    kernel = np.ones((3, 3), np.uint8)
+    # remove noise
+    kernel = np.ones((3,3), np.uint8)
     bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_OPEN, kernel)
-    bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_CLOSE, kernel)
+
+    # remove very small components
+    num_labels, labels = cv2.connectedComponents(bone_mask)
+    for i in range(1, num_labels):
+        if np.sum(labels == i) < 200:
+            bone_mask[labels == i] = 0
 
     return bone_mask
 
@@ -116,7 +119,6 @@ def create_soft_tissue_mask(body_mask, lung_mask, bone_mask):
 
     soft_mask = body_mask.copy()
 
-    # Remove lung + bone
     soft_mask[lung_mask == 1] = 0
     soft_mask[bone_mask == 1] = 0
 
