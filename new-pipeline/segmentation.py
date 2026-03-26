@@ -57,14 +57,14 @@ def predict_lung_mask(model, img_norm):
     with torch.no_grad():
         output = model(input_tensor)
 
-    # ✅ Correct activation for your model
+    # Multi-label → sigmoid
     probs = torch.sigmoid(output)
     probs = probs.squeeze().cpu().numpy()
 
-    # ✅ You confirmed lung = channel 0
+    # Lung = channel 0 (as you verified)
     lung_prob = probs[0]
 
-    # ✅ Resize back to original size (IMPORTANT)
+    # Resize back
     lung_prob = cv2.resize(
         lung_prob,
         (img_norm.shape[1], img_norm.shape[0]),
@@ -75,26 +75,36 @@ def predict_lung_mask(model, img_norm):
 
 
 # ------------------------------
-# Postprocess Mask
+# Postprocess Lung Mask
 # ------------------------------
 def postprocess_lung_mask(lung_prob, threshold=0.5):
 
     lung_mask = (lung_prob > threshold).astype(np.uint8)
 
-    # Morphological cleanup only (SAFE)
+    # Morphological cleanup
     kernel = np.ones((5, 5), np.uint8)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
+
+    # 🔥 Smooth edges (important)
+    lung_mask = cv2.GaussianBlur(lung_mask.astype(np.float32), (5, 5), 0)
+    lung_mask = (lung_mask > 0.5).astype(np.uint8)
 
     return lung_mask
 
 
 # ------------------------------
-# Bone Mask from HU
+# Bone Mask from HU (FIXED)
 # ------------------------------
-def create_bone_mask(img_hu, bone_threshold=300):
+def create_bone_mask(img_hu):
 
-    bone_mask = (img_hu > bone_threshold).astype(np.uint8)
+    # Better range for bone
+    bone_mask = ((img_hu > 300) & (img_hu < 2000)).astype(np.uint8)
+
+    # Clean noise
+    kernel = np.ones((3, 3), np.uint8)
+    bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_OPEN, kernel)
+    bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_CLOSE, kernel)
 
     return bone_mask
 
@@ -105,6 +115,8 @@ def create_bone_mask(img_hu, bone_threshold=300):
 def create_soft_tissue_mask(body_mask, lung_mask, bone_mask):
 
     soft_mask = body_mask.copy()
+
+    # Remove lung + bone
     soft_mask[lung_mask == 1] = 0
     soft_mask[bone_mask == 1] = 0
 
