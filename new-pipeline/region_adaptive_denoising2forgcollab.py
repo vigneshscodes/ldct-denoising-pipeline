@@ -62,7 +62,7 @@ def apply_nlm(img):
 
 
 def apply_bm3d(img):
-    # 🔥 Stronger BM3D (KEY FIX)
+    # Stronger BM3D (KEY FIX)
     return bm3d(img, sigma_psd=0.07).astype(np.float32)
 
 # ============================
@@ -140,7 +140,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         mask_sum = lung_mask + bone_mask + soft_mask
 
         # --------------------------
-        # 🔥 FINAL FUSION (FIXED)
+        # FINAL FUSION (FIXED)
         # --------------------------
         I_region = (
             lung_mask * (0.6 * I_bilateral + 0.4 * img) +
@@ -149,7 +149,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
             (1 - mask_sum) * img
         )
 
-        # 🔥 FINAL SMOOTHING (IMPORTANT)
+        # FINAL SMOOTHING (IMPORTANT)
         I_region = cv2.GaussianBlur(I_region, (3, 3), 0.5)
 
         save_path = os.path.join(
@@ -160,4 +160,4 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 
         save_image(I_region, save_path)
 
-print("\n✅ DONE: Region-wise denoising completed")
+print("\nDONE: Region-wise denoising completed")
