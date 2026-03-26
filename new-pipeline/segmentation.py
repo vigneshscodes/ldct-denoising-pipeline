@@ -76,20 +76,20 @@ def predict_lung_mask(model, img_norm):
 # ------------------------------
 # Postprocess Lung Mask (IMPROVED BUT SAFE)
 # ------------------------------
+import scipy.ndimage as ndi
+
 def postprocess_lung_mask(lung_prob):
 
-    # lower threshold (key fix)
     lung_mask = (lung_prob > 0.3).astype(np.uint8)
 
     kernel = np.ones((5, 5), np.uint8)
 
-    # expand region
     lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
-
-    # fill gaps
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
 
-    # remove noise
+    # KEY FIX: fill holes inside lungs
+    lung_mask = ndi.binary_fill_holes(lung_mask).astype(np.uint8)
+
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
 
     return lung_mask
