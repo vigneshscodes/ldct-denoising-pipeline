@@ -1,12 +1,9 @@
-# main_pipeline.py
-
 import os
 import numpy as np
 import cv2
 
 from preprocessing import load_dicom, apply_lung_window
 from ldct_simulation import simulate_ldct
-from enhancement import enhance_ldct
 from segmentation import (
     load_segmentation_model,
     predict_lung_mask,
@@ -16,17 +13,16 @@ from segmentation import (
 )
 
 # --------------------------
-# CONFIGURE PATHS HERE
+# CONFIGURE PATHS
 # --------------------------
 INPUT_ROOTS = [
     r"D:\CT_Datasets\NDCT",
     r"D:\CT_Datasets\NDCT_Eval"
 ]
-LDCT_ROOT   = r"D:\CT_Datasets\LDCT"
-ENH_ROOT    = r"D:\CT_Datasets\LDCT_Enhanced"
+
+LDCT_ROOT = r"D:\CT_Datasets\LDCT"
 
 os.makedirs(LDCT_ROOT, exist_ok=True)
-os.makedirs(ENH_ROOT, exist_ok=True)
 
 # --------------------------
 # PATIENT SPLITS
@@ -123,49 +119,37 @@ for INPUT_ROOT in INPUT_ROOTS:
             relative_path = os.path.join(split, relative_subpath)
 
             ldct_folder = os.path.join(LDCT_ROOT, relative_path)
-            enh_folder  = os.path.join(ENH_ROOT, relative_path)
-
             os.makedirs(ldct_folder, exist_ok=True)
-            os.makedirs(enh_folder, exist_ok=True)
 
             ldct_path = os.path.join(ldct_folder, file)
-            enh_path  = os.path.join(enh_folder, file)
 
             base_name = os.path.splitext(file)[0]
 
             # --------------------------
-            # STEP 1: Load ORIGINAL HU
+            # STEP 1: Load NDCT (HU)
             # --------------------------
             ds, img_hu = load_dicom(input_path)
 
             # --------------------------
-            # REGION MASKS FROM ORIGINAL HU
+            # STEP 2: Region masks from NDCT
             # --------------------------
             bone_mask = create_bone_mask(img_hu)
             body_mask = (img_hu > -700).astype(np.uint8)
 
             # --------------------------
-            # STEP 2: Apply Lung Window
+            # STEP 3: Lung window + normalize
             # --------------------------
             img_norm, lower, upper = apply_lung_window(img_hu)
 
             # --------------------------
-            # STEP 3: Simulate LDCT
+            # STEP 4: Simulate LDCT
             # --------------------------
             ldct_norm, ldct_hu = simulate_ldct(img_norm, lower, upper)
+
             save_dicom(ds, ldct_hu, ldct_path)
 
             # --------------------------
-            # STEP 4: Enhancement
-            # --------------------------
-            enhanced_norm = enhance_ldct(ldct_norm)
-            enhanced_norm = np.clip(enhanced_norm, 0, 1)
-
-            enhanced_hu = enhanced_norm * (upper - lower) + lower
-            save_dicom(ds, enhanced_hu, enh_path)
-
-            # --------------------------
-            # STEP 5: Lung Segmentation (FIXED INPUT)
+            # STEP 5: Segmentation (ON LDCT)
             # --------------------------
             lung_prob = predict_lung_mask(seg_model, ldct_norm)
             lung_mask = postprocess_lung_mask(lung_prob)
@@ -173,26 +157,17 @@ for INPUT_ROOT in INPUT_ROOTS:
             lung_percent = np.sum(lung_mask) / lung_mask.size * 100
             print(f"{split} | {file} → Lung area: {lung_percent:.2f}%")
 
-            overlay = enhanced_norm.copy()
-            overlay[lung_mask == 1] = 1
-
             # --------------------------
-            # STEP 6: Soft Tissue Mask
+            # STEP 6: Soft tissue mask
             # --------------------------
             soft_mask = create_soft_tissue_mask(body_mask, lung_mask, bone_mask)
 
             # --------------------------
-            # SAVE VERIFICATION OUTPUTS
+            # SAVE OUTPUTS (verification)
             # --------------------------
-            save_png(lung_mask, os.path.join(enh_folder, f"{base_name}_lung_mask.png"))
-            save_png(bone_mask, os.path.join(enh_folder, f"{base_name}_bone_mask.png"))
-            save_png(soft_mask, os.path.join(enh_folder, f"{base_name}_soft_mask.png"))
-            save_png(overlay, os.path.join(enh_folder, f"{base_name}_lung_overlay.png"))
-
-            # Optional debug images
-            save_png(img_norm, os.path.join(ldct_folder, f"{base_name}_ndct.png"))
             save_png(ldct_norm, os.path.join(ldct_folder, f"{base_name}_ldct.png"))
-            save_png(enhanced_norm, os.path.join(enh_folder, f"{base_name}_enhanced.png"))
+            save_png(lung_mask, os.path.join(ldct_folder, f"{base_name}_lung_mask.png"))
+            save_png(bone_mask, os.path.join(ldct_folder, f"{base_name}_bone_mask.png"))
+            save_png(soft_mask, os.path.join(ldct_folder, f"{base_name}_soft_mask.png"))
 
 print("Pipeline completed successfully.")
-

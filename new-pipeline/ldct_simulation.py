@@ -1,5 +1,3 @@
-# ldct_simulation.py
-
 import numpy as np
 
 
@@ -8,41 +6,62 @@ def simulate_ldct(img_norm,
                   upper,
                   dose_factor=0.15,
                   base_photon_count=1500,
-                  gaussian_sigma=0.005):
+                  gaussian_sigma=0.002):
     """
-    Realistic LDCT simulation using signal-dependent Poisson noise.
+    Physics-inspired LDCT simulation using Beer-Lambert + Poisson noise.
 
-    Parameters:
-    - img_norm: windowed image normalized to [0,1]
-    - lower, upper: HU window bounds
-    - dose_factor: relative dose level (0.25 = 25% dose)
-    - base_photon_count: controls noise magnitude
-    - gaussian_sigma: small detector noise
+    Improvements:
+    - Exponential attenuation (more realistic than linear)
+    - Log transform (approximates CT reconstruction physics)
+    - Reduced Gaussian noise (secondary effect)
 
     Returns:
     - ldct_norm (0–1)
     - ldct_hu (HU scale)
     """
 
-    # Photon count proportional to signal and dose
-    photon_count = img_norm * (base_photon_count * dose_factor)
+    epsilon = 1e-6
 
-    # Prevent zero photon regions
+    # ---------------------------------
+    # Step 1: Simulate attenuation
+    # (Beer-Lambert approximation)
+    # ---------------------------------
+    attenuation = np.exp(-img_norm)
+
+    # ---------------------------------
+    # Step 2: Photon count with dose scaling
+    # ---------------------------------
+    photon_count = base_photon_count * dose_factor * attenuation
     photon_count = np.clip(photon_count, 1, None)
 
-    # Apply Poisson noise
+    # ---------------------------------
+    # Step 3: Apply Poisson noise
+    # ---------------------------------
     noisy_photons = np.random.poisson(photon_count)
 
-    # Normalize back to [0,1]
-    ldct_norm = noisy_photons / (base_photon_count * dose_factor)
+    # ---------------------------------
+    # Step 4: Log transform (reconstruction)
+    # ---------------------------------
+    ldct_norm = -np.log((noisy_photons + epsilon) /
+                        (base_photon_count * dose_factor))
 
-    # Add small Gaussian detector noise
+    # ---------------------------------
+    # Step 5: Normalize to [0,1]
+    # ---------------------------------
+    ldct_norm = (ldct_norm - ldct_norm.min()) / (
+        ldct_norm.max() - ldct_norm.min() + epsilon
+    )
+
+    # ---------------------------------
+    # Step 6: Add small Gaussian noise
+    # ---------------------------------
     gaussian_noise = np.random.normal(0, gaussian_sigma, img_norm.shape)
-
     ldct_norm = ldct_norm + gaussian_noise
     ldct_norm = np.clip(ldct_norm, 0, 1)
 
-    # Convert back to HU
+    # ---------------------------------
+    # Step 7: Convert back to HU
+    # ---------------------------------
     ldct_hu = ldct_norm * (upper - lower) + lower
 
     return ldct_norm, ldct_hu

@@ -28,7 +28,7 @@ def apply_lung_window(img_hu, window_level=-600, window_width=1500):
 
     img_windowed = np.clip(img_hu, lower, upper)
 
-    # Normalize to [0,1]
-    img_norm = (img_windowed - lower) / (upper - lower)
+    img_norm = (img_windowed - lower) / (upper - lower + 1e-6)
+    img_norm = np.clip(img_norm, 0, 1)
 
     return img_norm, lower, upper
