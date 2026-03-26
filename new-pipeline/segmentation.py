@@ -80,11 +80,16 @@ def postprocess_lung_mask(lung_prob, threshold=0.5):
 
     lung_mask = (lung_prob > threshold).astype(np.uint8)
 
-    # Fill small holes (important fix)
-    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, np.ones((7,7), np.uint8))
+    # Morphological cleanup
+    kernel = np.ones((5, 5), np.uint8)
+    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
+    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
 
-    # Remove small noise
-    lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+    #  ADD THIS (IMPORTANT FIX)
+    lung_mask = cv2.medianBlur(lung_mask, 5)
+
+    kernel = np.ones((7, 7), np.uint8)
+    lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
 
     return lung_mask
 
