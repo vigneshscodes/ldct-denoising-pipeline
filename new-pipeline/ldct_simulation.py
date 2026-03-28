@@ -2,9 +2,10 @@ import numpy as np
 
 
 def simulate_ldct(img_hu,
-                  dose_factor=0.15,
-                  I0=1e5,
-                  gaussian_sigma=0.002):
+                  dose_factor=0.25,     # tuned (was too low)
+                  I0=1e6,               # increased photon count
+                  gaussian_sigma=0.001  # reduced electronic noise
+                  ):
     """
     Physically consistent LDCT simulation using Beer-Lambert law.
 
@@ -41,7 +42,7 @@ def simulate_ldct(img_hu,
     noisy_I = np.random.poisson(I_low)
 
     # ---------------------------------
-    # Step 5: Log reconstruction (FIXED)
+    # Step 5: Log reconstruction (CORRECT)
     # ---------------------------------
     mu_noisy = -np.log((noisy_I + epsilon) / (I0 * dose_factor))
 
