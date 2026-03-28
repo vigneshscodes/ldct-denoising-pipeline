@@ -1,67 +1,65 @@
 import numpy as np
 
 
-def simulate_ldct(img_norm,
-                  lower,
-                  upper,
+def simulate_ldct(img_hu,
                   dose_factor=0.15,
-                  base_photon_count=1500,
+                  I0=1e5,
                   gaussian_sigma=0.002):
     """
-    Physics-inspired LDCT simulation using Beer-Lambert + Poisson noise.
+    Physically consistent LDCT simulation using Beer-Lambert law.
 
-    Improvements:
-    - Exponential attenuation (more realistic than linear)
-    - Log transform (approximates CT reconstruction physics)
-    - Reduced Gaussian noise (secondary effect)
+    Input:
+    - img_hu: CT image in Hounsfield Units
 
-    Returns:
-    - ldct_norm (0–1)
-    - ldct_hu (HU scale)
+    Output:
+    - ldct_hu
+    - ldct_norm (for model use)
     """
 
     epsilon = 1e-6
 
     # ---------------------------------
-    # Step 1: Simulate attenuation
-    # (Beer-Lambert approximation)
+    # Step 1: Convert HU → linear attenuation (mu)
     # ---------------------------------
-    attenuation = np.exp(-img_norm)
+    mu_water = 0.02  # approximate
+    mu = mu_water * (img_hu / 1000.0 + 1)
 
     # ---------------------------------
-    # Step 2: Photon count with dose scaling
+    # Step 2: Beer-Lambert law
     # ---------------------------------
-    photon_count = base_photon_count * dose_factor * attenuation
-    photon_count = np.clip(photon_count, 1, None)
+    I = I0 * np.exp(-mu)
 
     # ---------------------------------
-    # Step 3: Apply Poisson noise
+    # Step 3: Dose reduction
     # ---------------------------------
-    noisy_photons = np.random.poisson(photon_count)
+    I_low = I * dose_factor
+    I_low = np.clip(I_low, 1, None)
 
     # ---------------------------------
-    # Step 4: Log transform (reconstruction)
+    # Step 4: Poisson noise
     # ---------------------------------
-    ldct_norm = -np.log((noisy_photons + epsilon) /
-                        (base_photon_count * dose_factor))
+    noisy_I = np.random.poisson(I_low)
 
     # ---------------------------------
-    # Step 5: Normalize to [0,1]
+    # Step 5: Log reconstruction
     # ---------------------------------
-    ldct_norm = (ldct_norm - ldct_norm.min()) / (
-        ldct_norm.max() - ldct_norm.min() + epsilon
-    )
+    mu_noisy = -np.log((noisy_I + epsilon) / I0)
 
     # ---------------------------------
-    # Step 6: Add small Gaussian noise
+    # Step 6: Convert back to HU
     # ---------------------------------
-    gaussian_noise = np.random.normal(0, gaussian_sigma, img_norm.shape)
-    ldct_norm = ldct_norm + gaussian_noise
+    ldct_hu = (mu_noisy / mu_water - 1) * 1000
+
+    # ---------------------------------
+    # Step 7: Normalize (ONLY for model)
+    # ---------------------------------
+    ldct_norm = (ldct_hu + 1000) / 1400
     ldct_norm = np.clip(ldct_norm, 0, 1)
 
     # ---------------------------------
-    # Step 7: Convert back to HU
+    # Step 8: Small electronic noise
     # ---------------------------------
-    ldct_hu = ldct_norm * (upper - lower) + lower
+    ldct_norm += np.random.normal(0, gaussian_sigma, ldct_norm.shape)
+    ldct_norm = np.clip(ldct_norm, 0, 1)
 
     return ldct_norm, ldct_hu

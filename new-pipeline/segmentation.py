@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import segmentation_models_pytorch as smp
 import torchvision.transforms as transforms
+import scipy.ndimage as ndi
 
 
 # ------------------------------
@@ -48,7 +49,7 @@ def preprocess_for_model(img_norm):
 
 
 # ------------------------------
-# Predict Lung Mask
+# Predict Lung Mask (SOFT + HARD)
 # ------------------------------
 def predict_lung_mask(model, img_norm):
 
@@ -60,7 +61,7 @@ def predict_lung_mask(model, img_norm):
     probs = torch.sigmoid(output)
     probs = probs.squeeze().cpu().numpy()
 
-    # Lung = channel 0
+    # Channel 0 corresponds to lung class (as per model training)
     lung_prob = probs[0]
 
     # Resize back to original resolution
@@ -70,36 +71,37 @@ def predict_lung_mask(model, img_norm):
         interpolation=cv2.INTER_LINEAR
     )
 
-    return lung_prob
+    # Hard mask (for visualization / region selection)
+    lung_mask = postprocess_lung_mask(lung_prob)
+
+    return lung_prob, lung_mask
 
 
 # ------------------------------
-# Postprocess Lung Mask (IMPROVED BUT SAFE)
+# Postprocess Lung Mask
 # ------------------------------
-import scipy.ndimage as ndi
+def postprocess_lung_mask(lung_prob, threshold=0.3):
 
-def postprocess_lung_mask(lung_prob):
-
-    lung_mask = (lung_prob > 0.3).astype(np.uint8)
+    lung_mask = (lung_prob > threshold).astype(np.uint8)
 
     kernel = np.ones((5, 5), np.uint8)
 
     lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
 
-    # KEY FIX: fill holes inside lungs
+    # Fill internal holes (segmentation artifacts)
     lung_mask = ndi.binary_fill_holes(lung_mask).astype(np.uint8)
 
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
 
     return lung_mask
 
+
 # ------------------------------
-# Bone Mask from HU (STABLE VERSION)
+# Bone Mask from HU
 # ------------------------------
 def create_bone_mask(img_hu, bone_threshold=300):
 
-    # Keep it simple and stable
     bone_mask = (img_hu > bone_threshold).astype(np.uint8)
 
     return bone_mask
@@ -112,7 +114,6 @@ def create_soft_tissue_mask(body_mask, lung_mask, bone_mask):
 
     soft_mask = body_mask.copy()
 
-    # Remove lung + bone regions
     soft_mask[lung_mask == 1] = 0
     soft_mask[bone_mask == 1] = 0
 

@@ -7,7 +7,6 @@ from ldct_simulation import simulate_ldct
 from segmentation import (
     load_segmentation_model,
     predict_lung_mask,
-    postprocess_lung_mask,
     create_bone_mask,
     create_soft_tissue_mask
 )
@@ -63,7 +62,7 @@ def save_dicom(original_ds, new_hu_img, save_path):
 
 
 def save_png(img_norm, save_path):
-    img_uint8 = (img_norm * 255).astype(np.uint8)
+    img_uint8 = (np.clip(img_norm, 0, 1) * 255).astype(np.uint8)
     cv2.imwrite(save_path, img_uint8)
 
 
@@ -112,7 +111,6 @@ for INPUT_ROOT in INPUT_ROOTS:
             relative_subpath = os.path.relpath(root, INPUT_ROOT)
             relative_path = os.path.join(split, relative_subpath)
 
-            # Separate folders
             ldct_folder = os.path.join(LDCT_ROOT, relative_path)
             seg_folder  = os.path.join(SEG_ROOT, relative_path)
 
@@ -131,17 +129,17 @@ for INPUT_ROOT in INPUT_ROOTS:
             # STEP 2: Region masks (from NDCT)
             # --------------------------
             bone_mask = create_bone_mask(img_hu)
-            body_mask = (img_hu > -700).astype(np.uint8)
+            body_mask = (img_hu > -800).astype(np.uint8)
 
             # --------------------------
             # STEP 3: Lung window
             # --------------------------
-            img_norm, lower, upper = apply_lung_window(img_hu)
+            img_hu, img_norm, lower, upper = apply_lung_window(img_hu)
 
             # --------------------------
-            # STEP 4: Simulate LDCT
+            # STEP 4: Simulate LDCT (FIXED)
             # --------------------------
-            ldct_norm, ldct_hu = simulate_ldct(img_norm, lower, upper)
+            ldct_norm, ldct_hu = simulate_ldct(img_hu)
 
             save_dicom(ds, ldct_hu, ldct_path)
 
@@ -150,10 +148,9 @@ for INPUT_ROOT in INPUT_ROOTS:
             save_png(ldct_norm, os.path.join(ldct_folder, f"{base_name}_ldct.png"))
 
             # --------------------------
-            # STEP 5: Segmentation (on LDCT)
+            # STEP 5: Segmentation (UPDATED)
             # --------------------------
-            lung_prob = predict_lung_mask(seg_model, ldct_norm)
-            lung_mask = postprocess_lung_mask(lung_prob)
+            lung_prob, lung_mask = predict_lung_mask(seg_model, ldct_norm)
 
             lung_percent = np.sum(lung_mask) / lung_mask.size * 100
             print(f"{split} | {file} → Lung area: {lung_percent:.2f}%")

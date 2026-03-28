@@ -1,12 +1,7 @@
-# preprocessing.py
-
 import pydicom
 import numpy as np
 
 
-# ------------------------------
-# Load DICOM and convert to HU
-# ------------------------------
 def load_dicom(path):
     ds = pydicom.dcmread(path)
     img = ds.pixel_array.astype(np.float32)
@@ -18,9 +13,6 @@ def load_dicom(path):
     return ds, img_hu
 
 
-# ------------------------------
-# Apply fixed lung window
-# ------------------------------
 def apply_lung_window(img_hu, window_level=-600, window_width=1500):
 
     lower = window_level - (window_width / 2)
@@ -28,7 +20,8 @@ def apply_lung_window(img_hu, window_level=-600, window_width=1500):
 
     img_windowed = np.clip(img_hu, lower, upper)
 
-    img_norm = (img_windowed - lower) / (upper - lower + 1e-6)
-    img_norm = np.clip(img_norm, 0, 1)
+    # Normalized version (for DL / segmentation)
+    img_norm = (img_windowed - lower) / (upper - lower)
+    img_norm = np.clip(img_norm, 0, 1).astype(np.float32)
 
-    return img_norm, lower, upper
+    return img_hu, img_norm, lower, upper

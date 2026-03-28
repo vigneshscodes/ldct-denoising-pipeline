@@ -3,41 +3,35 @@ import cv2
 
 
 # ---------------------------------
-# CLAHE in 16-bit (avoid banding)
+# Minimal Preconditioning (SAFE)
 # ---------------------------------
-def apply_clahe_float(img_norm, clip_limit=1.2):
-
-    img_uint16 = (img_norm * 65535).astype(np.uint16)
-
-    clahe = cv2.createCLAHE(
-        clipLimit=clip_limit,
-        tileGridSize=(8, 8)
-    )
-
-    clahe_img = clahe.apply(img_uint16)
-    clahe_img = clahe_img.astype(np.float32) / 65535.0
-
-    return clahe_img
+def minimal_preconditioning(img_norm):
+    """
+    Very mild smoothing to stabilize segmentation
+    WITHOUT altering noise statistics significantly
+    """
+    img_smooth = cv2.GaussianBlur(img_norm, (3, 3), 0.3)
+    return img_smooth
 
 
 # ---------------------------------
-# Mild Sharpening (safe)
+# FINAL ENHANCEMENT (NON-DESTRUCTIVE)
 # ---------------------------------
-def mild_sharpen(img, alpha=0.25):
+def enhance_ldct(img_norm, mode="identity"):
+    """
+    Enhancement stage kept for structural completeness.
+    Does NOT modify image in a way that affects denoising.
 
-    blurred = cv2.GaussianBlur(img, (0, 0), sigmaX=1.0)
-    sharpened = img + alpha * (img - blurred)
+    Modes:
+    - "identity"  → no change (recommended)
+    - "minimal"   → very mild smoothing (optional)
+    """
 
-    return np.clip(sharpened, 0, 1)
+    if mode == "identity":
+        return img_norm
 
+    elif mode == "minimal":
+        return minimal_preconditioning(img_norm)
 
-# ---------------------------------
-# FINAL ENHANCEMENT
-# ---------------------------------
-def enhance_ldct(img_norm):
-
-    clahe_img = apply_clahe_float(img_norm, clip_limit=1.2)
-
-    enhanced = mild_sharpen(clahe_img, alpha=0.25)
-
-    return enhanced
+    else:
+        raise ValueError("Mode must be 'identity' or 'minimal'")
