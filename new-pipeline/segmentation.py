@@ -22,7 +22,6 @@ def load_segmentation_model(model_path):
     model.load_state_dict(state_dict)
 
     model.eval()
-
     return model
 
 
@@ -32,7 +31,6 @@ def load_segmentation_model(model_path):
 def preprocess_for_model(img_norm):
 
     img_3ch = np.stack([img_norm]*3, axis=-1).astype(np.float32)
-
     img_resized = cv2.resize(img_3ch, (256, 256)).astype(np.float32)
 
     transform = transforms.Compose([
@@ -44,7 +42,6 @@ def preprocess_for_model(img_norm):
     ])
 
     input_tensor = transform(img_resized).unsqueeze(0)
-
     return input_tensor
 
 
@@ -71,7 +68,6 @@ def predict_lung_mask(model, img_norm):
         interpolation=cv2.INTER_LINEAR
     )
 
-    # Hard mask (for visualization / region selection)
     lung_mask = postprocess_lung_mask(lung_prob)
 
     return lung_prob, lung_mask
@@ -89,7 +85,7 @@ def postprocess_lung_mask(lung_prob, threshold=0.3):
     lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_CLOSE, kernel)
 
-    # Fill internal holes (segmentation artifacts)
+    # Fill internal holes (important)
     lung_mask = ndi.binary_fill_holes(lung_mask).astype(np.uint8)
 
     lung_mask = cv2.morphologyEx(lung_mask, cv2.MORPH_OPEN, kernel)
@@ -98,23 +94,53 @@ def postprocess_lung_mask(lung_prob, threshold=0.3):
 
 
 # ------------------------------
-# Bone Mask from HU
+# Body Mask (IMPROVED - CRITICAL)
+# ------------------------------
+def create_body_mask(img_hu):
+
+    body_mask = (img_hu > -600).astype(np.uint8)
+
+    kernel = np.ones((7, 7), np.uint8)
+    body_mask = cv2.morphologyEx(body_mask, cv2.MORPH_CLOSE, kernel)
+    body_mask = cv2.morphologyEx(body_mask, cv2.MORPH_OPEN, kernel)
+
+    # Keep largest connected component
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(body_mask, connectivity=8)
+    largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+    body_mask = (labels == largest_label).astype(np.uint8)
+
+    return body_mask
+
+
+# ------------------------------
+# Bone Mask
 # ------------------------------
 def create_bone_mask(img_hu, bone_threshold=300):
 
     bone_mask = (img_hu > bone_threshold).astype(np.uint8)
 
+    kernel = np.ones((3, 3), np.uint8)
+    bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_OPEN, kernel)
+
     return bone_mask
 
 
 # ------------------------------
-# Soft Tissue Mask
+# Soft Tissue Mask (FINAL FIX)
 # ------------------------------
-def create_soft_tissue_mask(body_mask, lung_mask, bone_mask):
+def create_soft_tissue_mask(img_hu, lung_mask, bone_mask):
+
+    body_mask = create_body_mask(img_hu)
 
     soft_mask = body_mask.copy()
-
     soft_mask[lung_mask == 1] = 0
     soft_mask[bone_mask == 1] = 0
+
+    # Restrict HU range (very important)
+    soft_mask[(img_hu < -100) | (img_hu > 300)] = 0
+
+    kernel = np.ones((5, 5), np.uint8)
+    soft_mask = cv2.morphologyEx(soft_mask, cv2.MORPH_CLOSE, kernel)
+    soft_mask = cv2.morphologyEx(soft_mask, cv2.MORPH_OPEN, kernel)
 
     return soft_mask
