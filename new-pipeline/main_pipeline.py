@@ -125,11 +125,15 @@ for INPUT_ROOT in INPUT_ROOTS:
             # --------------------------
             ds, img_hu = load_dicom(input_path)
 
+            # FIX: Clamp HU
+            img_hu = np.clip(img_hu, -1000, 400)
+
+            print("HU range:", img_hu.min(), img_hu.max())
+
             # --------------------------
-            # STEP 2: Region masks (from NDCT)
+            # STEP 2: Region masks (CORRECT)
             # --------------------------
             bone_mask = create_bone_mask(img_hu)
-            body_mask = (img_hu > -800).astype(np.uint8)
 
             # --------------------------
             # STEP 3: Lung window
@@ -137,7 +141,7 @@ for INPUT_ROOT in INPUT_ROOTS:
             img_hu, img_norm, lower, upper = apply_lung_window(img_hu)
 
             # --------------------------
-            # STEP 4: Simulate LDCT (FIXED)
+            # STEP 4: Simulate LDCT (CORRECT INPUT)
             # --------------------------
             ldct_norm, ldct_hu = simulate_ldct(img_hu)
 
@@ -148,7 +152,7 @@ for INPUT_ROOT in INPUT_ROOTS:
             save_png(ldct_norm, os.path.join(ldct_folder, f"{base_name}_ldct.png"))
 
             # --------------------------
-            # STEP 5: Segmentation (UPDATED)
+            # STEP 5: Segmentation
             # --------------------------
             lung_prob, lung_mask = predict_lung_mask(seg_model, ldct_norm)
 
@@ -156,9 +160,9 @@ for INPUT_ROOT in INPUT_ROOTS:
             print(f"{split} | {file} → Lung area: {lung_percent:.2f}%")
 
             # --------------------------
-            # STEP 6: Soft tissue mask
+            # STEP 6: Soft tissue mask (FIXED)
             # --------------------------
-            soft_mask = create_soft_tissue_mask(body_mask, lung_mask, bone_mask)
+            soft_mask = create_soft_tissue_mask(img_hu, lung_mask, bone_mask)
 
             # --------------------------
             # SAVE SEGMENTATION OUTPUTS
