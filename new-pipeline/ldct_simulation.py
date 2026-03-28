@@ -12,8 +12,8 @@ def simulate_ldct(img_hu,
     - img_hu: CT image in Hounsfield Units
 
     Output:
-    - ldct_hu
     - ldct_norm (for model use)
+    - ldct_hu
     """
 
     epsilon = 1e-6
@@ -21,7 +21,7 @@ def simulate_ldct(img_hu,
     # ---------------------------------
     # Step 1: Convert HU → linear attenuation (mu)
     # ---------------------------------
-    mu_water = 0.02  # approximate
+    mu_water = 0.02
     mu = mu_water * (img_hu / 1000.0 + 1)
 
     # ---------------------------------
@@ -41,9 +41,9 @@ def simulate_ldct(img_hu,
     noisy_I = np.random.poisson(I_low)
 
     # ---------------------------------
-    # Step 5: Log reconstruction
+    # Step 5: Log reconstruction (FIXED)
     # ---------------------------------
-    mu_noisy = -np.log((noisy_I + epsilon) / I0)
+    mu_noisy = -np.log((noisy_I + epsilon) / (I0 * dose_factor))
 
     # ---------------------------------
     # Step 6: Convert back to HU
@@ -54,7 +54,7 @@ def simulate_ldct(img_hu,
     # Step 7: Normalize (ONLY for model)
     # ---------------------------------
     ldct_norm = (ldct_hu + 1000) / 1400
-    ldct_norm = np.clip(ldct_norm, 0, 1)
+    ldct_norm = np.clip(ldct_norm, 0, 1).astype(np.float32)
 
     # ---------------------------------
     # Step 8: Small electronic noise
