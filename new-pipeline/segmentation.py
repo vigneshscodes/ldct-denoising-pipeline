@@ -101,7 +101,6 @@ def create_body_mask(img_hu):
     body_mask = cv2.morphologyEx(body_mask, cv2.MORPH_CLOSE, kernel)
     body_mask = cv2.morphologyEx(body_mask, cv2.MORPH_OPEN, kernel)
 
-    # Keep largest component
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(body_mask, connectivity=8)
     largest_label = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
     body_mask = (labels == largest_label).astype(np.uint8)
@@ -110,22 +109,27 @@ def create_body_mask(img_hu):
 
 
 # ------------------------------
-# Bone Mask (FINAL FIX - CLEAN)
+# Bone Mask (FINAL PERFECT FIX)
 # ------------------------------
 def create_bone_mask(img_hu, bone_threshold=300):
 
     bone_mask = (img_hu > bone_threshold).astype(np.uint8)
 
+    # Strong cleanup
     kernel = np.ones((5, 5), np.uint8)
     bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_CLOSE, kernel)
     bone_mask = cv2.morphologyEx(bone_mask, cv2.MORPH_OPEN, kernel)
 
-    # Remove small noisy regions
+    # Connected components filtering (STRONGER)
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(bone_mask, connectivity=8)
 
     cleaned = np.zeros_like(bone_mask)
+
     for i in range(1, num_labels):
-        if stats[i, cv2.CC_STAT_AREA] > 200:   # threshold area
+        area = stats[i, cv2.CC_STAT_AREA]
+
+        # Keep only meaningful bone structures
+        if area > 500:   # 🔥 increased threshold (was 200)
             cleaned[labels == i] = 1
 
     return cleaned
@@ -142,7 +146,7 @@ def create_soft_tissue_mask(img_hu, lung_mask, bone_mask):
     soft_mask[lung_mask == 1] = 0
     soft_mask[bone_mask == 1] = 0
 
-    # Strict HU constraint (important)
+    # Strict HU constraint
     soft_mask[(img_hu < -100) | (img_hu > 300)] = 0
 
     kernel = np.ones((5, 5), np.uint8)

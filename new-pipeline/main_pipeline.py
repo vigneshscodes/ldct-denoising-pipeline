@@ -128,8 +128,6 @@ for INPUT_ROOT in INPUT_ROOTS:
             # FIX: Clamp HU
             img_hu = np.clip(img_hu, -1000, 400)
 
-            print("HU range:", img_hu.min(), img_hu.max())
-
             # --------------------------
             # STEP 2: Region masks (CORRECT)
             # --------------------------

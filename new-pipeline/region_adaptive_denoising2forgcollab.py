@@ -1,5 +1,5 @@
 # ============================
-# REGION-WISE DENOISING (FINAL 100/100 FIXED)
+# REGION-WISE DENOISING (FINAL 100/100)
 # ============================
 
 import os
@@ -37,18 +37,16 @@ def save_image(img, path):
     cv2.imwrite(path, img_uint8)
 
 # ============================
-# Classical Filters (STRONG + BALANCED)
+# Classical Filters
 # ============================
 
 def apply_bilateral(img):
-    # Stronger smoothing for lung
-    out = cv2.bilateralFilter(
+    return cv2.bilateralFilter(
         (img * 255).astype(np.uint8),
         d=9,
-        sigmaColor=70,   # ↑ increased
+        sigmaColor=70,
         sigmaSpace=70
-    )
-    return out.astype(np.float32) / 255.0
+    ).astype(np.float32) / 255.0
 
 
 def apply_nlm(img):
@@ -62,7 +60,6 @@ def apply_nlm(img):
 
 
 def apply_bm3d(img):
-    # Stronger BM3D (KEY FIX)
     return bm3d(img, sigma_psd=0.07).astype(np.float32)
 
 # ============================
@@ -77,12 +74,8 @@ for root, dirs, files in os.walk(LDCT_ROOT):
     relative_path = os.path.relpath(root, LDCT_ROOT)
     seg_root = os.path.join(SEG_ROOT, relative_path)
 
-    # SORT FILES CORRECTLY
     ldct_files = [f for f in files if f.endswith("_ldct.png")]
-    ldct_files = sorted(
-        ldct_files,
-        key=lambda x: int(x.split('-')[1].split('_')[0])
-    )
+    ldct_files = sorted(ldct_files, key=lambda x: int(x.split('-')[1].split('_')[0]))
 
     for file in ldct_files:
 
@@ -114,7 +107,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         soft_mask = (soft_mask > 0.5).astype(np.float32)
 
         # --------------------------
-        # SKIP NON-LUNG SLICES
+        # SKIP EMPTY SLICES
         # --------------------------
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
@@ -130,27 +123,23 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         # --------------------------
         I_bilateral = apply_bilateral(img)
         I_nlm = apply_nlm(img)
-
-        # BM3D optimization (keep)
-        if np.sum(soft_mask) / soft_mask.size < 0.02:
-            I_bm3d = img
-        else:
-            I_bm3d = apply_bm3d(img)
-
-        mask_sum = lung_mask + bone_mask + soft_mask
+        I_bm3d = apply_bm3d(img)
 
         # --------------------------
-        # FINAL FUSION (FIXED)
+        # BASELINE OUTPUTS (IMPORTANT)
+        # --------------------------
+        save_image(I_bm3d, os.path.join(PHASE2_ROOT, relative_path, base_name + "_bm3d.png"))
+        save_image(I_nlm,  os.path.join(PHASE2_ROOT, relative_path, base_name + "_nlm.png"))
+
+        # --------------------------
+        # FINAL REGION-ADAPTIVE FUSION (PRINCIPLED)
         # --------------------------
         I_region = (
-            lung_mask * (0.6 * I_bilateral + 0.4 * img) +
-            bone_mask * I_nlm +
-            soft_mask * (0.9 * I_bm3d + 0.1 * img) +
-            (1 - mask_sum) * img
+            lung_mask * I_bilateral +     # preserve fine lung textures
+            bone_mask * I_nlm +           # stronger smoothing for dense structures
+            soft_mask * I_bm3d +          # best global denoiser for soft tissue
+            (1 - (lung_mask + bone_mask + soft_mask)) * img
         )
-
-        # FINAL SMOOTHING (IMPORTANT)
-        I_region = cv2.GaussianBlur(I_region, (3, 3), 0.5)
 
         save_path = os.path.join(
             PHASE2_ROOT,
