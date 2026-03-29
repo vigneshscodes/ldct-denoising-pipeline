@@ -12,7 +12,7 @@ from segmentation import (
 )
 
 # --------------------------
-# CONFIGURE PATHS
+# PATHS
 # --------------------------
 INPUT_ROOTS = [
     r"D:\CT_Datasets\NDCT",
@@ -28,25 +28,14 @@ os.makedirs(SEG_ROOT, exist_ok=True)
 # --------------------------
 # PATIENT SPLITS
 # --------------------------
-TRAIN_PATIENTS = [
-"LIDC-IDRI-0001","LIDC-IDRI-0002","LIDC-IDRI-0003","LIDC-IDRI-0004","LIDC-IDRI-0005",
-"LIDC-IDRI-0006","LIDC-IDRI-0007","LIDC-IDRI-0008","LIDC-IDRI-0009","LIDC-IDRI-0010",
-"LIDC-IDRI-0011","LIDC-IDRI-0012","LIDC-IDRI-0013","LIDC-IDRI-0014","LIDC-IDRI-0015",
-"LIDC-IDRI-0016","LIDC-IDRI-0017","LIDC-IDRI-0018","LIDC-IDRI-0019","LIDC-IDRI-0020"
-]
-
-VAL_PATIENTS = [
-"LIDC-IDRI-0021","LIDC-IDRI-0022","LIDC-IDRI-0023"
-]
-
-TEST_PATIENTS = [
-"LIDC-IDRI-0024","LIDC-IDRI-0025","LIDC-IDRI-0026"
-]
+TRAIN_PATIENTS = [f"LIDC-IDRI-{i:04d}" for i in range(1, 21)]
+VAL_PATIENTS   = [f"LIDC-IDRI-{i:04d}" for i in range(21, 24)]
+TEST_PATIENTS  = [f"LIDC-IDRI-{i:04d}" for i in range(24, 27)]
 
 ALL_PATIENTS = TRAIN_PATIENTS + VAL_PATIENTS + TEST_PATIENTS
 
 # --------------------------
-# Utility Functions
+# UTILS
 # --------------------------
 def save_dicom(original_ds, new_hu_img, save_path):
     ds_copy = original_ds.copy()
@@ -67,21 +56,20 @@ def save_png(img_norm, save_path):
 
 
 # --------------------------
-# Load Segmentation Model
+# LOAD MODEL
 # --------------------------
 MODEL_PATH = "model_100_epoch.pth"
 seg_model = load_segmentation_model(MODEL_PATH)
 
 print("Segmentation model loaded successfully.")
 
-
 # --------------------------
-# PROCESS LOOP
+# MAIN LOOP
 # --------------------------
 for INPUT_ROOT in INPUT_ROOTS:
     for root, dirs, files in os.walk(INPUT_ROOT):
 
-        # Detect patient ID
+        # Detect patient
         patient_id = None
         for part in root.split(os.sep):
             if part.startswith("LIDC-IDRI-"):
@@ -91,15 +79,13 @@ for INPUT_ROOT in INPUT_ROOTS:
         if patient_id is None or patient_id not in ALL_PATIENTS:
             continue
 
-        # Assign split
+        # Split
         if patient_id in TRAIN_PATIENTS:
             split = "train"
         elif patient_id in VAL_PATIENTS:
             split = "val"
-        elif patient_id in TEST_PATIENTS:
-            split = "test"
         else:
-            continue
+            split = "test"
 
         for file in files:
 
@@ -117,7 +103,6 @@ for INPUT_ROOT in INPUT_ROOTS:
             os.makedirs(ldct_folder, exist_ok=True)
             os.makedirs(seg_folder, exist_ok=True)
 
-            ldct_path = os.path.join(ldct_folder, file)
             base_name = os.path.splitext(file)[0]
 
             # --------------------------
@@ -125,45 +110,43 @@ for INPUT_ROOT in INPUT_ROOTS:
             # --------------------------
             ds, img_hu = load_dicom(input_path)
 
-            # FIX: Clamp HU
-            img_hu = np.clip(img_hu, -1000, 400)
+            img_hu = np.clip(img_hu, -1000, 400)   # keep original HU SAFE
 
             # --------------------------
-            # STEP 2: Region masks (CORRECT)
+            # STEP 2: Bone mask (from HU)
             # --------------------------
             bone_mask = create_bone_mask(img_hu)
 
             # --------------------------
-            # STEP 3: Lung window
+            # STEP 3: Windowing (DO NOT overwrite HU)
             # --------------------------
-            img_hu, img_norm, lower, upper = apply_lung_window(img_hu)
+            _, img_norm, lower, upper = apply_lung_window(img_hu)
 
             # --------------------------
-            # STEP 4: Simulate LDCT (CORRECT INPUT)
+            # STEP 4: LDCT simulation (CORRECT INPUT)
             # --------------------------
-            ldct_norm, ldct_hu = simulate_ldct(img_hu)
+            ldct_norm, ldct_hu = simulate_ldct(img_norm, lower, upper)
 
-            save_dicom(ds, ldct_hu, ldct_path)
-
-            # Save NDCT + LDCT PNGs
+            # Save DICOM + PNGs
+            save_dicom(ds, ldct_hu, os.path.join(ldct_folder, file))
             save_png(img_norm, os.path.join(ldct_folder, f"{base_name}_ndct.png"))
             save_png(ldct_norm, os.path.join(ldct_folder, f"{base_name}_ldct.png"))
 
             # --------------------------
-            # STEP 5: Segmentation
+            # STEP 5: Lung segmentation (on LDCT)
             # --------------------------
-            lung_prob, lung_mask = predict_lung_mask(seg_model, ldct_norm)
+            _, lung_mask = predict_lung_mask(seg_model, ldct_norm)
 
             lung_percent = np.sum(lung_mask) / lung_mask.size * 100
-            print(f"{split} | {file} → Lung area: {lung_percent:.2f}%")
+            print(f"{split} | {file} → Lung: {lung_percent:.2f}%")
 
             # --------------------------
-            # STEP 6: Soft tissue mask (FIXED)
+            # STEP 6: Soft tissue mask (from HU)
             # --------------------------
             soft_mask = create_soft_tissue_mask(img_hu, lung_mask, bone_mask)
 
             # --------------------------
-            # SAVE SEGMENTATION OUTPUTS
+            # SAVE MASKS
             # --------------------------
             save_png(lung_mask, os.path.join(seg_folder, f"{base_name}_lung_mask.png"))
             save_png(bone_mask, os.path.join(seg_folder, f"{base_name}_bone_mask.png"))

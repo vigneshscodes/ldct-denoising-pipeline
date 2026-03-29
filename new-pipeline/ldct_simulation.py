@@ -1,66 +1,48 @@
+# ldct_simulation.py
+
 import numpy as np
 
 
-def simulate_ldct(img_hu,
-                  dose_factor=0.25,
-                  I0=1e6,
-                  gaussian_sigma=0.001):
+def simulate_ldct(img_norm,
+                  lower,
+                  upper,
+                  dose_factor=0.15,
+                  base_photon_count=1500,
+                  gaussian_sigma=0.005):
     """
-    Physically consistent LDCT simulation using Beer-Lambert law.
+    Realistic LDCT simulation using signal-dependent Poisson noise.
 
-    Input:
-    - img_hu: CT image in Hounsfield Units
+    Parameters:
+    - img_norm: windowed image normalized to [0,1]
+    - lower, upper: HU window bounds
+    - dose_factor: relative dose level (0.25 = 25% dose)
+    - base_photon_count: controls noise magnitude
+    - gaussian_sigma: small detector noise
 
-    Output:
-    - ldct_norm (for model use)
-    - ldct_hu
+    Returns:
+    - ldct_norm (0–1)
+    - ldct_hu (HU scale)
     """
 
-    epsilon = 1e-6
+    # Photon count proportional to signal and dose
+    photon_count = img_norm * (base_photon_count * dose_factor)
 
-    # ---------------------------------
-    # Step 1: Convert HU → linear attenuation (mu)
-    # ---------------------------------
-    mu_water = 0.02
-    mu = mu_water * (img_hu / 1000.0 + 1)
+    # Prevent zero photon regions
+    photon_count = np.clip(photon_count, 1, None)
 
-    # ---------------------------------
-    # Step 2: Beer-Lambert law
-    # ---------------------------------
-    I = I0 * np.exp(-mu)
+    # Apply Poisson noise
+    noisy_photons = np.random.poisson(photon_count)
 
-    # ---------------------------------
-    # Step 3: Dose reduction
-    # ---------------------------------
-    I_low = I * dose_factor
-    I_low = np.clip(I_low, 1, None)
+    # Normalize back to [0,1]
+    ldct_norm = noisy_photons / (base_photon_count * dose_factor)
 
-    # ---------------------------------
-    # Step 4: Poisson noise
-    # ---------------------------------
-    noisy_I = np.random.poisson(I_low).astype(np.float32)
+    # Add small Gaussian detector noise
+    gaussian_noise = np.random.normal(0, gaussian_sigma, img_norm.shape)
 
-    # ---------------------------------
-    # Step 5: Log reconstruction
-    # ---------------------------------
-    mu_noisy = -np.log((noisy_I + epsilon) / (I0 * dose_factor))
-
-    # ---------------------------------
-    # Step 6: Convert back to HU
-    # ---------------------------------
-    ldct_hu = (mu_noisy / mu_water - 1) * 1000
-
-    # ---------------------------------
-    # Step 7: Normalize (ONLY for model)
-    # ---------------------------------
-    ldct_norm = (ldct_hu + 1000) / 1400
-    ldct_norm = np.clip(ldct_norm, 0, 1).astype(np.float32)
-
-    # ---------------------------------
-    # Step 8: Small electronic noise (CONTROLLED)
-    # ---------------------------------
-    noise = np.random.normal(0, gaussian_sigma, ldct_norm.shape).astype(np.float32)
-    ldct_norm = ldct_norm + noise
+    ldct_norm = ldct_norm + gaussian_noise
     ldct_norm = np.clip(ldct_norm, 0, 1)
+
+    # Convert back to HU
+    ldct_hu = ldct_norm * (upper - lower) + lower
 
     return ldct_norm, ldct_hu

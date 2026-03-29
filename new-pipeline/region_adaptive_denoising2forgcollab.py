@@ -1,5 +1,5 @@
 # ============================
-# REGION-WISE DENOISING (FINAL BEST VERSION)
+# REGION-WISE DENOISING (FINAL PERFECT)
 # ============================
 
 import os
@@ -9,7 +9,7 @@ from skimage.restoration import denoise_nl_means
 from bm3d import bm3d
 
 # ============================
-# CONFIGURATION
+# CONFIG
 # ============================
 
 LDCT_ROOT = r"D:\CT_Datasets\LDCT"
@@ -21,7 +21,7 @@ EVAL_PATIENT = "LIDC-IDRI-0001"
 os.makedirs(PHASE2_ROOT, exist_ok=True)
 
 # ============================
-# Utility
+# UTIL
 # ============================
 
 def load_image(path):
@@ -35,7 +35,7 @@ def save_image(img, path):
     cv2.imwrite(path, (img * 255).astype(np.uint8))
 
 # ============================
-# Filters (STABLE + EFFECTIVE)
+# FILTERS (BALANCED FINAL)
 # ============================
 
 def apply_bilateral(img):
@@ -50,7 +50,7 @@ def apply_bilateral(img):
 def apply_nlm(img):
     return denoise_nl_means(
         img,
-        h=0.18,   # 🔥 stronger than old (key fix)
+        h=0.15,   # balanced (not over-smooth)
         fast_mode=True,
         patch_size=5,
         patch_distance=6
@@ -58,7 +58,7 @@ def apply_nlm(img):
 
 
 def apply_bm3d(img):
-    return bm3d(img, sigma_psd=0.05).astype(np.float32)  # keep light
+    return bm3d(img, sigma_psd=0.05).astype(np.float32)
 
 # ============================
 # MAIN LOOP
@@ -96,13 +96,13 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         soft_mask = (load_image(soft_path) > 0.5).astype(np.float32)
 
         # --------------------------
-        # FIX 1: Expand lung (IMPORTANT)
+        # FIX 1: LIGHT lung expansion (avoid missing regions)
         # --------------------------
-        kernel = np.ones((5, 5), np.uint8)
+        kernel = np.ones((3, 3), np.uint8)   # smaller → safer
         lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
 
         # --------------------------
-        # SKIP SMALL LUNG SLICES
+        # SKIP EMPTY SLICES
         # --------------------------
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
@@ -113,6 +113,10 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         bone_mask = bone_mask * (1 - lung_mask)
         soft_mask = soft_mask * (1 - lung_mask)
         soft_mask = soft_mask * (1 - bone_mask)
+
+        # Remaining area (safe)
+        other_mask = 1 - (lung_mask + bone_mask + soft_mask)
+        other_mask = np.clip(other_mask, 0, 1)
 
         # --------------------------
         # FILTERS
@@ -125,10 +129,10 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         # FINAL FUSION (BEST BALANCE)
         # --------------------------
         I_region = (
-            lung_mask * (0.5 * I_bilateral + 0.5 * I_nlm) +  # 🔥 key balance
+            lung_mask * (0.6 * I_bilateral + 0.4 * I_nlm) +  # key fix
             bone_mask * I_nlm +
             soft_mask * I_bm3d +
-            (1 - (lung_mask + bone_mask + soft_mask)) * img
+            other_mask * img
         )
 
         save_path = os.path.join(
