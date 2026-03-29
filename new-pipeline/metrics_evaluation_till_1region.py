@@ -16,7 +16,14 @@ LDCT_ROOT   = r"D:\CT_Datasets\LDCT"
 SEG_ROOT    = r"D:\CT_Datasets\Segmentation"
 PHASE2_ROOT = r"D:\CT_Datasets\Phase2_Output"
 
-PATIENT = "LIDC-IDRI-0001"
+# --------------------------
+# PATIENT SPLITS
+# --------------------------
+TRAIN_PATIENTS = [f"LIDC-IDRI-{i:04d}" for i in range(1, 21)]
+VAL_PATIENTS   = [f"LIDC-IDRI-{i:04d}" for i in range(21, 24)]
+TEST_PATIENTS  = [f"LIDC-IDRI-{i:04d}" for i in range(24, 27)]
+
+ALL_PATIENTS = TRAIN_PATIENTS + VAL_PATIENTS + TEST_PATIENTS
 
 # ============================
 # UTIL
@@ -60,7 +67,7 @@ psnr_region_list, ssim_region_list = [], []
 
 for root, dirs, files in os.walk(LDCT_ROOT):
 
-    if PATIENT not in root:
+    if not any(p in root for p in ALL_PATIENTS):
         continue
 
     relative_path = os.path.relpath(root, LDCT_ROOT)
