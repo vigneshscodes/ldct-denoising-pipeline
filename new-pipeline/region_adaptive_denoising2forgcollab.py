@@ -1,5 +1,5 @@
 # ============================
-# REGION-WISE DENOISING (FINAL 100/100 PERFECT)
+# REGION-WISE DENOISING (FINAL STABLE VERSION)
 # ============================
 
 import os
@@ -33,26 +33,27 @@ def load_image(path):
 
 def save_image(img, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    img_uint8 = np.clip(img * 255, 0, 255).astype(np.uint8)
+    img = np.clip(img, 0, 1)
+    img_uint8 = (img * 255).astype(np.uint8)
     cv2.imwrite(path, img_uint8)
 
 # ============================
-# Filters (FINAL TUNED)
+# Filters
 # ============================
 
 def apply_bilateral(img):
     return cv2.bilateralFilter(
         (img * 255).astype(np.uint8),
         d=9,
-        sigmaColor=90,
-        sigmaSpace=75
+        sigmaColor=85,
+        sigmaSpace=70
     ).astype(np.float32) / 255.0
 
 
 def apply_nlm(img):
     return denoise_nl_means(
         img,
-        h=0.15,
+        h=0.14,
         fast_mode=True,
         patch_size=5,
         patch_distance=6
@@ -60,7 +61,6 @@ def apply_nlm(img):
 
 
 def apply_bm3d(img):
-    # 🔥 FIX: avoid over-smoothing
     return bm3d(img, sigma_psd=0.07).astype(np.float32)
 
 # ============================
@@ -101,52 +101,63 @@ for root, dirs, files in os.walk(LDCT_ROOT):
             continue
 
         # --------------------------
-        # BINARIZE MASKS
+        # BINARIZE
         # --------------------------
         lung_mask = (lung_mask > 0.5).astype(np.float32)
         bone_mask = (bone_mask > 0.5).astype(np.float32)
         soft_mask = (soft_mask > 0.5).astype(np.float32)
 
         # --------------------------
-        # HANDLE SEGMENTATION GAPS
+        # FIX 1: Expand lung (CRITICAL)
         # --------------------------
         kernel = np.ones((5, 5), np.uint8)
         lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
 
         # --------------------------
-        # SKIP EMPTY SLICES
+        # FIX 2: Smooth mask edges (NEW - IMPORTANT)
+        # --------------------------
+        lung_mask = cv2.GaussianBlur(lung_mask, (5, 5), 0)
+        lung_mask = (lung_mask > 0.3).astype(np.float32)
+
+        # --------------------------
+        # SKIP EMPTY
         # --------------------------
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
 
         # --------------------------
-        # ENSURE STRICT EXCLUSIVITY (CRITICAL FIX)
+        # FIX 3: Strict exclusivity
         # --------------------------
         bone_mask = bone_mask * (1 - lung_mask)
-        soft_mask = soft_mask * (1 - lung_mask) * (1 - bone_mask)
+        soft_mask = soft_mask * (1 - lung_mask)
 
-        # Recompute leftover region safely
-        other_mask = 1 - (lung_mask + bone_mask + soft_mask)
-        other_mask = np.clip(other_mask, 0, 1)
+        # Remove overlap between bone & soft
+        soft_mask = soft_mask * (1 - bone_mask)
 
         # --------------------------
-        # APPLY FILTERS
+        # FIX 4: Stable remainder mask
+        # --------------------------
+        total_mask = lung_mask + bone_mask + soft_mask
+        other_mask = np.clip(1 - total_mask, 0, 1)
+
+        # --------------------------
+        # FILTERS
         # --------------------------
         I_bilateral = apply_bilateral(img)
         I_nlm = apply_nlm(img)
         I_bm3d = apply_bm3d(img)
 
         # --------------------------
-        # BASELINES (FOR REPORT)
+        # SAVE BASELINES
         # --------------------------
         save_image(I_bm3d, os.path.join(PHASE2_ROOT, relative_path, base_name + "_bm3d.png"))
         save_image(I_nlm,  os.path.join(PHASE2_ROOT, relative_path, base_name + "_nlm.png"))
 
         # --------------------------
-        # FINAL REGION FUSION (CLEAN + BALANCED)
+        # FINAL FUSION (STABLE)
         # --------------------------
         I_region = (
-            lung_mask * (0.6 * I_bilateral + 0.4 * I_nlm) +
+            lung_mask * (0.4 * I_bilateral + 0.6 * I_nlm) +
             bone_mask * I_nlm +
             soft_mask * I_bm3d +
             other_mask * img
