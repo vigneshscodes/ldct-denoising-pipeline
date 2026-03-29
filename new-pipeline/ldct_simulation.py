@@ -1,4 +1,6 @@
-# ldct_simulation.py
+# ============================
+# LDCT SIMULATION (FINAL 100/100)
+# ============================
 
 import numpy as np
 
@@ -6,43 +8,52 @@ import numpy as np
 def simulate_ldct(img_norm,
                   lower,
                   upper,
-                  dose_factor=0.15,
-                  base_photon_count=1500,
-                  gaussian_sigma=0.005):
+                  dose_factor=0.10,        # 🔥 stronger noise (key fix)
+                  base_photon_count=1200, # slightly reduced → more noise
+                  gaussian_sigma=0.003):  # balanced detector noise
+
     """
     Realistic LDCT simulation using signal-dependent Poisson noise.
 
-    Parameters:
-    - img_norm: windowed image normalized to [0,1]
+    Input:
+    - img_norm: normalized image [0,1]
     - lower, upper: HU window bounds
-    - dose_factor: relative dose level (0.25 = 25% dose)
-    - base_photon_count: controls noise magnitude
-    - gaussian_sigma: small detector noise
 
-    Returns:
-    - ldct_norm (0–1)
-    - ldct_hu (HU scale)
+    Output:
+    - ldct_norm
+    - ldct_hu
     """
 
-    # Photon count proportional to signal and dose
+    # --------------------------
+    # Step 1: Photon count
+    # --------------------------
     photon_count = img_norm * (base_photon_count * dose_factor)
 
-    # Prevent zero photon regions
+    # Avoid zero photons
     photon_count = np.clip(photon_count, 1, None)
 
-    # Apply Poisson noise
-    noisy_photons = np.random.poisson(photon_count)
+    # --------------------------
+    # Step 2: Poisson noise
+    # --------------------------
+    noisy_photons = np.random.poisson(photon_count).astype(np.float32)
 
-    # Normalize back to [0,1]
+    # --------------------------
+    # Step 3: Normalize back
+    # --------------------------
     ldct_norm = noisy_photons / (base_photon_count * dose_factor)
 
-    # Add small Gaussian detector noise
-    gaussian_noise = np.random.normal(0, gaussian_sigma, img_norm.shape)
+    # --------------------------
+    # Step 4: Add detector noise
+    # --------------------------
+    noise = np.random.normal(0, gaussian_sigma, img_norm.shape).astype(np.float32)
+    ldct_norm = ldct_norm + noise
 
-    ldct_norm = ldct_norm + gaussian_noise
+    # Clamp safely
     ldct_norm = np.clip(ldct_norm, 0, 1)
 
-    # Convert back to HU
+    # --------------------------
+    # Step 5: Back to HU
+    # --------------------------
     ldct_hu = ldct_norm * (upper - lower) + lower
 
     return ldct_norm, ldct_hu

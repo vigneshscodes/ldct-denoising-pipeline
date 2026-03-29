@@ -35,7 +35,7 @@ def save_image(img, path):
     cv2.imwrite(path, (img * 255).astype(np.uint8))
 
 # ============================
-# FILTERS (BALANCED FINAL)
+# FILTERS (FINAL TUNED)
 # ============================
 
 def apply_bilateral(img):
@@ -50,7 +50,7 @@ def apply_bilateral(img):
 def apply_nlm(img):
     return denoise_nl_means(
         img,
-        h=0.15,   # balanced (not over-smooth)
+        h=0.15,
         fast_mode=True,
         patch_size=5,
         patch_distance=6
@@ -96,13 +96,13 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         soft_mask = (load_image(soft_path) > 0.5).astype(np.float32)
 
         # --------------------------
-        # FIX 1: LIGHT lung expansion (avoid missing regions)
+        # FIX 1: LIGHT lung expansion
         # --------------------------
-        kernel = np.ones((3, 3), np.uint8)   # smaller → safer
+        kernel = np.ones((3, 3), np.uint8)
         lung_mask = cv2.dilate(lung_mask, kernel, iterations=1)
 
         # --------------------------
-        # SKIP EMPTY SLICES
+        # SKIP SMALL LUNG SLICES
         # --------------------------
         if np.sum(lung_mask) / lung_mask.size < 0.05:
             continue
@@ -114,25 +114,25 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         soft_mask = soft_mask * (1 - lung_mask)
         soft_mask = soft_mask * (1 - bone_mask)
 
-        # Remaining area (safe)
+        # Remaining region (safe)
         other_mask = 1 - (lung_mask + bone_mask + soft_mask)
         other_mask = np.clip(other_mask, 0, 1)
 
         # --------------------------
-        # FILTERS
+        # APPLY FILTERS
         # --------------------------
         I_bilateral = apply_bilateral(img)
         I_nlm = apply_nlm(img)
         I_bm3d = apply_bm3d(img)
 
         # --------------------------
-        # FINAL FUSION (BEST BALANCE)
+        # FINAL FUSION (CORRECTED)
         # --------------------------
         I_region = (
-            lung_mask * (0.6 * I_bilateral + 0.4 * I_nlm) +  # key fix
-            bone_mask * I_nlm +
+            lung_mask * (0.6 * I_bilateral + 0.4 * I_nlm) +
+            bone_mask * (0.7 * I_nlm + 0.3 * I_bm3d) +
             soft_mask * I_bm3d +
-            other_mask * img
+            other_mask * I_bm3d  
         )
 
         save_path = os.path.join(

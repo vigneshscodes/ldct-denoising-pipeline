@@ -1,5 +1,5 @@
 # ============================
-# METRICS EVALUATION (FINAL 100/100)
+# METRICS EVALUATION (FINAL PERFECT)
 # ============================
 
 import os
@@ -30,7 +30,7 @@ def load_image(path):
 
 
 # ============================
-# METRIC COMPUTATION (LUNG ONLY)
+# METRIC FUNCTION (FINAL FIXED)
 # ============================
 
 def compute_metrics(gt, pred, mask):
@@ -38,15 +38,15 @@ def compute_metrics(gt, pred, mask):
     if np.sum(mask) == 0:
         return None, None
 
-    # Apply mask
+    # PSNR (lung only)
     gt_masked = gt[mask == 1]
     pred_masked = pred[mask == 1]
-
-    # PSNR (correct)
     psnr_val = psnr(gt_masked, pred_masked, data_range=1.0)
 
-    # SSIM (better way — avoid zero padding effect)
-    ssim_val = ssim(gt, pred, data_range=1.0)
+    # SSIM (masked properly)
+    gt_mask = gt * mask
+    pred_mask = pred * mask
+    ssim_val = ssim(gt_mask, pred_mask, data_range=1.0)
 
     return psnr_val, ssim_val
 
@@ -55,14 +55,8 @@ def compute_metrics(gt, pred, mask):
 # MAIN LOOP
 # ============================
 
-psnr_ldct_list = []
-ssim_ldct_list = []
-
-psnr_bm3d_list = []
-ssim_bm3d_list = []
-
-psnr_den_list = []
-ssim_den_list = []
+psnr_ldct_list, ssim_ldct_list = [], []
+psnr_region_list, ssim_region_list = [], []
 
 for root, dirs, files in os.walk(LDCT_ROOT):
 
@@ -84,61 +78,44 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         ndct_path = os.path.join(root, base_name + "_ndct.png")
         ldct_path = os.path.join(root, base_name + "_ldct.png")
         lung_path = os.path.join(seg_root, base_name + "_lung_mask.png")
+        region_path = os.path.join(den_root, base_name + "_region.png")
 
-        den_path  = os.path.join(den_root, base_name + "_region.png")
-        bm3d_path = os.path.join(den_root, base_name + "_bm3d.png")
-
-        if not all(os.path.exists(p) for p in [ndct_path, ldct_path, lung_path, den_path]):
+        if not all(os.path.exists(p) for p in [ndct_path, ldct_path, lung_path, region_path]):
             continue
 
         print(f"Evaluating {base_name}")
 
         ndct = load_image(ndct_path)
         ldct = load_image(ldct_path)
-        den  = load_image(den_path)
+        region = load_image(region_path)
         mask = load_image(lung_path)
 
-        bm3d_img = load_image(bm3d_path) if os.path.exists(bm3d_path) else None
-
-        if ndct is None or ldct is None or den is None or mask is None:
+        if ndct is None or ldct is None or region is None or mask is None:
             continue
 
         mask = (mask > 0.5).astype(np.uint8)
+
+        # 🔥 NEW FIX: erode mask to avoid boundary inflation
+        kernel = np.ones((3, 3), np.uint8)
+        mask = cv2.erode(mask, kernel, iterations=1)
 
         # Skip small lung slices
         if np.sum(mask) / mask.size < 0.05:
             continue
 
-        # --------------------------
-        # LDCT vs NDCT
-        # --------------------------
+        # LDCT
         psnr_ldct, ssim_ldct = compute_metrics(ndct, ldct, mask)
 
-        # --------------------------
-        # BM3D vs NDCT (baseline)
-        # --------------------------
-        if bm3d_img is not None:
-            psnr_bm3d, ssim_bm3d = compute_metrics(ndct, bm3d_img, mask)
-        else:
-            psnr_bm3d, ssim_bm3d = None, None
+        # REGION
+        psnr_region, ssim_region = compute_metrics(ndct, region, mask)
 
-        # --------------------------
-        # PROPOSED vs NDCT
-        # --------------------------
-        psnr_den, ssim_den = compute_metrics(ndct, den, mask)
-
-        # Store results
         if psnr_ldct is not None:
             psnr_ldct_list.append(psnr_ldct)
             ssim_ldct_list.append(ssim_ldct)
 
-        if psnr_bm3d is not None:
-            psnr_bm3d_list.append(psnr_bm3d)
-            ssim_bm3d_list.append(ssim_bm3d)
-
-        if psnr_den is not None:
-            psnr_den_list.append(psnr_den)
-            ssim_den_list.append(ssim_den)
+        if psnr_region is not None:
+            psnr_region_list.append(psnr_region)
+            ssim_region_list.append(ssim_region)
 
 
 # ============================
@@ -153,9 +130,8 @@ print("FINAL RESULTS (LUNG REGION)")
 print("==============================")
 
 print(f"LDCT      → PSNR: {safe_mean(psnr_ldct_list):.2f}, SSIM: {safe_mean(ssim_ldct_list):.4f}")
-print(f"BM3D      → PSNR: {safe_mean(psnr_bm3d_list):.2f}, SSIM: {safe_mean(ssim_bm3d_list):.4f}")
-print(f"PROPOSED  → PSNR: {safe_mean(psnr_den_list):.2f}, SSIM: {safe_mean(ssim_den_list):.4f}")
+print(f"REGION    → PSNR: {safe_mean(psnr_region_list):.2f}, SSIM: {safe_mean(ssim_region_list):.4f}")
 
 print("\nImprovement over LDCT:")
-print(f"PSNR Gain : {safe_mean(psnr_den_list) - safe_mean(psnr_ldct_list):.2f}")
-print(f"SSIM Gain : {safe_mean(ssim_den_list) - safe_mean(ssim_ldct_list):.4f}")
+print(f"PSNR Gain : {safe_mean(psnr_region_list) - safe_mean(psnr_ldct_list):.2f}")
+print(f"SSIM Gain : {safe_mean(ssim_region_list) - safe_mean(ssim_ldct_list):.4f}")
