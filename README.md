@@ -125,7 +125,9 @@ CT_Datasets
 ├── Phase2_Output
 ├── Phase3_CNN_Refined
 └── CNN_Dataset_PatientWise
-```---
+```
+
+---
 
 ## Key Features
 
