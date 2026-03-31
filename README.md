@@ -117,13 +117,13 @@ Metrics are computed **only inside the lung region**:
 
 ## Project Structure
 CT_Datasets
-├── NDCT
-├── NDCT_Eval
-├── LDCT
-├── Segmentation
-├── Phase2_Output
-├── Phase3_CNN_Refined
-└── CNN_Dataset_PatientWise
+```├── NDCT
+```├── NDCT_Eval
+```├── LDCT
+```├── Segmentation
+```├── Phase2_Output
+```├── Phase3_CNN_Refined
+```└── CNN_Dataset_PatientWise
 
 ---
 
