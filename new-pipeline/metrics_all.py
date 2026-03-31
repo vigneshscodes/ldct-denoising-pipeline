@@ -2,33 +2,27 @@ import os
 import cv2
 import numpy as np
 import pandas as pd
-from skimage.metrics import structural_similarity
+from skimage.metrics import structural_similarity as ssim
 
 
 # =========================================================
-# ROOT PATHS
+# ROOT PATHS (FINAL CORRECT)
 # =========================================================
 
-LDCT_ROOT = r"D:\CT_Datasets\LDCT"
-ENH_ROOT = r"D:\CT_Datasets\LDCT_Enhanced"
-PHASE1_ROOT = r"D:\CT_Datasets\Phase1_Classical"
-PHASE2_ROOT = r"D:\CT_Datasets\Phase2_RegionAdaptive"
-CNN_ROOT = r"D:\CT_Datasets\Phase3_CNN_Refined"
+LDCT_ROOT   = r"D:\CT_Datasets\LDCT"
+SEG_ROOT    = r"D:\CT_Datasets\Segmentation"
+PHASE2_ROOT = r"D:\CT_Datasets\Phase2_Output"
+CNN_ROOT    = r"D:\CT_Datasets\Phase3_CNN_Refined"
 
-OUTPUT_CSV = "all_metrics_summary.csv"
+OUTPUT_CSV = "final_metrics_summary.csv"
 
 
 # =========================================================
-# CNN SPLIT
+# PATIENT SPLIT
 # =========================================================
 
-VALIDATION_PATIENTS = [
-"LIDC-IDRI-0021","LIDC-IDRI-0022","LIDC-IDRI-0023"
-]
-
-TEST_PATIENTS = [
-"LIDC-IDRI-0024","LIDC-IDRI-0025","LIDC-IDRI-0026"
-]
+VAL_PATIENTS = [f"LIDC-IDRI-{i:04d}" for i in range(21, 24)]
+TEST_PATIENTS = [f"LIDC-IDRI-{i:04d}" for i in range(24, 27)]
 
 
 # =========================================================
@@ -37,6 +31,8 @@ TEST_PATIENTS = [
 
 def load_image(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return None
     return img.astype(np.float32) / 255.0
 
 
@@ -49,7 +45,6 @@ def compute_psnr(gt, pred, mask):
         return None
 
     mse = np.mean((gt - pred) ** 2)
-
     if mse == 0:
         return 100
 
@@ -57,12 +52,7 @@ def compute_psnr(gt, pred, mask):
 
 
 def compute_ssim(gt, pred, mask):
-
-    return structural_similarity(
-        gt * mask,
-        pred * mask,
-        data_range=1.0
-    )
+    return ssim(gt * mask, pred * mask, data_range=1.0)
 
 
 # =========================================================
@@ -70,14 +60,10 @@ def compute_ssim(gt, pred, mask):
 # =========================================================
 
 results = {
-"LDCT": [],
-"Enhanced": [],
-"Bilateral_Lung": [],
-"NLM_Lung": [],
-"BM3D_Lung": [],
-"Region_Adaptive": [],
-"CNN_Validation": [],
-"CNN_Test": []
+    "LDCT": [],
+    "REGION": [],
+    "CNN_VAL": [],
+    "CNN_TEST": []
 }
 
 ssim_results = {k: [] for k in results.keys()}
@@ -94,132 +80,93 @@ for root, dirs, files in os.walk(LDCT_ROOT):
         if not file.endswith("_ndct.png"):
             continue
 
-        base = file.replace("_ndct.png","")
+        base = file.replace("_ndct.png", "")
+        relative = os.path.relpath(root, LDCT_ROOT)
 
-        ndct_path = os.path.join(root,file)
-        ldct_path = os.path.join(root,base+"_ldct.png")
+        # Paths
+        ndct_path = os.path.join(root, file)
+        ldct_path = os.path.join(root, base + "_ldct.png")
 
-        relative = os.path.relpath(root,LDCT_ROOT)
+        seg_path   = os.path.join(SEG_ROOT, relative, base + "_lung_mask.png")
+        region_path = os.path.join(PHASE2_ROOT, relative, base + "_region.png")
+        cnn_path    = os.path.join(CNN_ROOT, relative, base + "_cnn_refined.png")
 
-        enh_folder = os.path.join(ENH_ROOT,relative)
-        phase1_folder = os.path.join(PHASE1_ROOT,relative)
-        phase2_folder = os.path.join(PHASE2_ROOT,relative)
-        cnn_folder = os.path.join(CNN_ROOT,relative)
-
-        enh_path = os.path.join(enh_folder,base+"_enhanced.png")
-        mask_path = os.path.join(enh_folder,base+"_lung_mask.png")
-
-        bil_path = os.path.join(phase1_folder,base+"_bilateral_lung.png")
-        nlm_path = os.path.join(phase1_folder,base+"_nlm_lung.png")
-        bm3d_path = os.path.join(phase1_folder,base+"_bm3d_lung.png")
-
-        region_path = os.path.join(phase2_folder,base+"_region_adaptive.png")
-        cnn_path = os.path.join(cnn_folder,base+"_cnn_refined.png")
-
-        if not os.path.exists(mask_path):
+        if not os.path.exists(seg_path):
             continue
 
-
+        # Load
         ndct = load_image(ndct_path)
         ldct = load_image(ldct_path)
-        mask = (load_image(mask_path)>0.5).astype(np.uint8)
+        mask = load_image(seg_path)
 
-        if np.sum(mask)/mask.size < 0.05:
+        if ndct is None or ldct is None or mask is None:
             continue
 
+        mask = (mask > 0.5).astype(np.uint8)
+
+        # 🔥 SAME FIX as your best pipeline
+        kernel = np.ones((3, 3), np.uint8)
+        mask = cv2.erode(mask, kernel, iterations=1)
+
+        # Skip small lung
+        if np.sum(mask) / mask.size < 0.05:
+            continue
 
         # ---------------------------------------------------
         # LDCT
         # ---------------------------------------------------
+        ps = compute_psnr(ndct, ldct, mask)
+        ss = compute_ssim(ndct, ldct, mask)
 
-        psnr = compute_psnr(ndct,ldct,mask)
-        ssim = compute_ssim(ndct,ldct,mask)
-
-        if psnr is not None:
-            results["LDCT"].append(psnr)
-            ssim_results["LDCT"].append(ssim)
-
+        if ps is not None:
+            results["LDCT"].append(ps)
+            ssim_results["LDCT"].append(ss)
 
         # ---------------------------------------------------
-        # ENHANCED
+        # REGION
         # ---------------------------------------------------
-
-        if os.path.exists(enh_path):
-
-            enh = load_image(enh_path)
-
-            psnr = compute_psnr(ndct,enh,mask)
-            ssim = compute_ssim(ndct,enh,mask)
-
-            if psnr is not None:
-                results["Enhanced"].append(psnr)
-                ssim_results["Enhanced"].append(ssim)
-
-
-        # ---------------------------------------------------
-        # PHASE 1
-        # ---------------------------------------------------
-
-        for name,path in zip(
-            ["Bilateral_Lung","NLM_Lung","BM3D_Lung"],
-            [bil_path,nlm_path,bm3d_path]
-        ):
-
-            if os.path.exists(path):
-
-                img = load_image(path)
-
-                psnr = compute_psnr(ndct,img,mask)
-                ssim = compute_ssim(ndct,img,mask)
-
-                if psnr is not None:
-                    results[name].append(psnr)
-                    ssim_results[name].append(ssim)
-
-
-        # ---------------------------------------------------
-        # PHASE 2
-        # ---------------------------------------------------
-
         if os.path.exists(region_path):
 
             region = load_image(region_path)
 
-            psnr = compute_psnr(ndct,region,mask)
-            ssim = compute_ssim(ndct,region,mask)
+            if region is not None:
+                ps = compute_psnr(ndct, region, mask)
+                ss = compute_ssim(ndct, region, mask)
 
-            if psnr is not None:
-                results["Region_Adaptive"].append(psnr)
-                ssim_results["Region_Adaptive"].append(ssim)
-
+                if ps is not None:
+                    results["REGION"].append(ps)
+                    ssim_results["REGION"].append(ss)
 
         # ---------------------------------------------------
         # CNN
         # ---------------------------------------------------
-
-        patient_id = None
-        for part in relative.split(os.sep):
-            if part.startswith("LIDC-IDRI-"):
-                patient_id = part
-                break
-
-
         if os.path.exists(cnn_path):
 
             cnn = load_image(cnn_path)
 
-            psnr = compute_psnr(ndct,cnn,mask)
-            ssim = compute_ssim(ndct,cnn,mask)
+            if cnn is None:
+                continue
 
-            if psnr is not None:
+            ps = compute_psnr(ndct, cnn, mask)
+            ss = compute_ssim(ndct, cnn, mask)
 
-                if patient_id in VALIDATION_PATIENTS:
-                    results["CNN_Validation"].append(psnr)
-                    ssim_results["CNN_Validation"].append(ssim)
+            if ps is None:
+                continue
 
-                if patient_id in TEST_PATIENTS:
-                    results["CNN_Test"].append(psnr)
-                    ssim_results["CNN_Test"].append(ssim)
+            # detect patient
+            patient_id = None
+            for part in relative.split(os.sep):
+                if part.startswith("LIDC-IDRI-"):
+                    patient_id = part
+                    break
+
+            if patient_id in VAL_PATIENTS:
+                results["CNN_VAL"].append(ps)
+                ssim_results["CNN_VAL"].append(ss)
+
+            elif patient_id in TEST_PATIENTS:
+                results["CNN_TEST"].append(ps)
+                ssim_results["CNN_TEST"].append(ss)
 
 
 # =========================================================
@@ -229,34 +176,34 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 summary = []
 
 print("\n==============================")
-print("FINAL PIPELINE METRICS")
+print("FINAL RESULTS (LUNG REGION)")
 print("==============================\n")
 
 for method in results.keys():
 
-    if len(results[method])==0:
+    if len(results[method]) == 0:
         continue
 
     psnr_mean = np.mean(results[method])
-    psnr_std = np.std(results[method])
+    psnr_std  = np.std(results[method])
 
     ssim_mean = np.mean(ssim_results[method])
-    ssim_std = np.std(ssim_results[method])
+    ssim_std  = np.std(ssim_results[method])
 
     print(method)
-    print("PSNR:",psnr_mean,"±",psnr_std)
-    print("SSIM:",ssim_mean,"±",ssim_std,"\n")
+    print(f"PSNR: {psnr_mean:.2f} ± {psnr_std:.2f}")
+    print(f"SSIM: {ssim_mean:.4f} ± {ssim_std:.4f}\n")
 
     summary.append({
-        "Method":method,
-        "PSNR_mean":psnr_mean,
-        "PSNR_std":psnr_std,
-        "SSIM_mean":ssim_mean,
-        "SSIM_std":ssim_std
+        "Method": method,
+        "PSNR_mean": psnr_mean,
+        "PSNR_std": psnr_std,
+        "SSIM_mean": ssim_mean,
+        "SSIM_std": ssim_std
     })
 
 
 df = pd.DataFrame(summary)
-df.to_csv(OUTPUT_CSV,index=False)
+df.to_csv(OUTPUT_CSV, index=False)
 
-print("Saved summary to",OUTPUT_CSV)
+print("✅ Saved summary to:", OUTPUT_CSV)
