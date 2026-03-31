@@ -123,7 +123,7 @@ CT_Datasets
 ├── Segmentation
 ├── Phase2_Output
 ├── Phase3_CNN_Refined
-└── CNN_Dataset_PatientWise
+└── CNN_Dataset_PatientWise```
 
 ---
 
