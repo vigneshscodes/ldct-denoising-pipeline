@@ -113,6 +113,7 @@ Metrics are computed **only inside the lung region**:
 - No overfitting due to early stopping  
 - Strong generalization on unseen test patients  
 
+---
 
 ## Project Structure
 
