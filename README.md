@@ -28,36 +28,6 @@ Patient-wise splitting ensures **no data leakage**.
 ---
 
 ## Pipeline
-# Low-Dose CT Denoising using Region-Adaptive Filtering and CNN Refinement
-
-## Overview
-
-This project presents a hybrid pipeline for Low-Dose CT (LDCT) denoising, combining classical image processing with a lightweight CNN for refinement.
-
-The objective is to reduce noise while preserving lung structures using:
-
-- Physics-based LDCT simulation  
-- Segmentation-guided region processing  
-- Region-adaptive denoising  
-- CNN-based refinement  
-
----
-
-## Dataset
-
-CT scans are sourced from the **LIDC-IDRI dataset (TCIA)**.
-
-### Dataset Split (Patient-wise)
-
-- **Training:** Patients 1–20  
-- **Validation:** Patients 21–23  
-- **Testing:** Patients 24–26  
-
-Patient-wise splitting ensures **no data leakage**.
-
----
-
-## Pipeline
 NDCT → LDCT Simulation → Segmentation → Region-Adaptive Denoising → CNN Refinement → Evaluation
 
 
