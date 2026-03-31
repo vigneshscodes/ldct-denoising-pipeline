@@ -8,7 +8,7 @@ import numpy as np
 def simulate_ldct(img_norm,
                   lower,
                   upper,
-                  dose_factor=0.10,        # 🔥 stronger noise (key fix)
+                  dose_factor=0.10,        #  stronger noise (key fix)
                   base_photon_count=1200, # slightly reduced → more noise
                   gaussian_sigma=0.003):  # balanced detector noise
 

@@ -12,8 +12,8 @@ import torch.nn as nn
 MODEL_PATH = r"D:\CT_Datasets\best_model.pth"
 
 LDCT_ROOT   = r"D:\CT_Datasets\LDCT"
-REGION_ROOT = r"D:\CT_Datasets\Phase2_Output"   # ✅ FIXED
-SEG_ROOT    = r"D:\CT_Datasets\Segmentation"    # ✅ FIXED
+REGION_ROOT = r"D:\CT_Datasets\Phase2_Output"   
+SEG_ROOT    = r"D:\CT_Datasets\Segmentation"   
 
 OUTPUT_ROOT = r"D:\CT_Datasets\Phase3_CNN_Refined"
 
@@ -99,7 +99,6 @@ for root, dirs, files in os.walk(REGION_ROOT):
 
     for file in files:
 
-        # ✅ FIXED filename
         if not file.endswith("_region.png"):
             continue
 
@@ -149,4 +148,4 @@ for root, dirs, files in os.walk(REGION_ROOT):
         print("Saved:", save_path)
 
 
-print("\n✅ CNN inference completed for TEST patients")
+print("\nCNN inference completed for TEST patients")

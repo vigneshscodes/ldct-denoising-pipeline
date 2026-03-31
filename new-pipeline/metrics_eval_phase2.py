@@ -102,7 +102,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 
         mask = (mask > 0.5).astype(np.uint8)
 
-        # 🔥 NEW FIX: erode mask to avoid boundary inflation
+        # NEW FIX: erode mask to avoid boundary inflation
         kernel = np.ones((3, 3), np.uint8)
         mask = cv2.erode(mask, kernel, iterations=1)
 

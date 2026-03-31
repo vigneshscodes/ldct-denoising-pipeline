@@ -104,7 +104,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 
         mask = (mask > 0.5).astype(np.uint8)
 
-        # 🔥 SAME FIX as your best pipeline
+        # SAME FIX as your best pipeline
         kernel = np.ones((3, 3), np.uint8)
         mask = cv2.erode(mask, kernel, iterations=1)
 
@@ -206,4 +206,4 @@ for method in results.keys():
 df = pd.DataFrame(summary)
 df.to_csv(OUTPUT_CSV, index=False)
 
-print("✅ Saved summary to:", OUTPUT_CSV)
+print("Saved summary to:", OUTPUT_CSV)

@@ -142,7 +142,7 @@ for root, dirs, files in os.walk(LDCT_ROOT):
 # SUMMARY
 # ==========================
 
-print("\n✅ Dataset creation finished.")
+print("\nDataset creation finished.")
 print("Train samples:", train_count)
 print("Val samples:", val_count)
 print("Test samples:", test_count)

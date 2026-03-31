@@ -25,3 +25,13 @@ venv/
 # system files
 .DS_Store
 Thumbs.db
+
+# logs
+*.log
+
+# temp files
+*.tmp
+*.temp
+
+# large zip files
+*.zip

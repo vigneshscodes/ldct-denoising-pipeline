@@ -1,142 +1,176 @@
-# Low-Dose CT Denoising using Classical Methods and Lightweight CNN Refinement
+# Low-Dose CT Denoising using Region-Adaptive Filtering and CNN Refinement
 
 ## Overview
 
-This project implements a modular pipeline for **Low-Dose CT (LDCT) denoising** using a combination of classical image processing and a lightweight convolutional neural network (CNN). The goal is to reduce noise in simulated LDCT scans while preserving anatomical structures in lung regions.
+This project presents a hybrid pipeline for Low-Dose CT (LDCT) denoising, combining classical image processing with a lightweight CNN for refinement.
 
-The pipeline integrates physics-based noise simulation, segmentation-guided denoising, and CNN refinement to produce high-quality reconstructed CT images.
+The objective is to reduce noise while preserving lung structures using:
+
+- Physics-based LDCT simulation  
+- Segmentation-guided region processing  
+- Region-adaptive denoising  
+- CNN-based refinement  
 
 ---
 
 ## Dataset
 
-CT scans are obtained from the **LIDC-IDRI dataset** available on The Cancer Imaging Archive (TCIA).
+CT scans are sourced from the **LIDC-IDRI dataset (TCIA)**.
 
-Dataset usage:
+### Dataset Split (Patient-wise)
 
-* **Training:** 20 patients
-* **Validation:** 3 patients
-* **Testing:** 3 patients
+- **Training:** Patients 1–20  
+- **Validation:** Patients 21–23  
+- **Testing:** Patients 24–26  
 
-All evaluations are performed **patient-wise** to avoid data leakage.
+Patient-wise splitting ensures **no data leakage**.
 
 ---
 
 ## Pipeline
+# Low-Dose CT Denoising using Region-Adaptive Filtering and CNN Refinement
 
-The processing pipeline consists of the following stages:
+## Overview
 
-1. **NDCT Input**
-2. **LDCT Simulation**
+This project presents a hybrid pipeline for Low-Dose CT (LDCT) denoising, combining classical image processing with a lightweight CNN for refinement.
 
-   * Poisson noise model for low-dose simulation
-3. **Image Enhancement**
+The objective is to reduce noise while preserving lung structures using:
 
-   * Wavelet denoising
-   * CLAHE contrast enhancement
-4. **Segmentation**
+- Physics-based LDCT simulation  
+- Segmentation-guided region processing  
+- Region-adaptive denoising  
+- CNN-based refinement  
 
-   * UNet-based lung segmentation
-5. **Phase 1: Classical Denoising**
+---
 
-   * Bilateral filter
-   * Non-local means
-   * BM3D
-6. **Phase 2: Region-Adaptive Denoising**
+## Dataset
 
-   * Lung → Bilateral
-   * Bone → NLM
-   * Soft Tissue → BM3D
-7. **Phase 3: CNN Refinement**
+CT scans are sourced from the **LIDC-IDRI dataset (TCIA)**.
 
-   * Lightweight 3-layer CNN
-   * Inputs: LDCT + Region-Adaptive Output + Lung Mask
-   * Loss: L1 + SSIM
-8. **Evaluation**
+### Dataset Split (Patient-wise)
 
-   * PSNR
-   * SSIM
+- **Training:** Patients 1–20  
+- **Validation:** Patients 21–23  
+- **Testing:** Patients 24–26  
+
+Patient-wise splitting ensures **no data leakage**.
+
+---
+
+## Pipeline
+NDCT → LDCT Simulation → Segmentation → Region-Adaptive Denoising → CNN Refinement → Evaluation
+
+
+---
+
+## Pipeline Stages
+
+### 1. LDCT Simulation
+- Poisson noise-based simulation  
+- Signal-dependent realistic noise  
+- Converts NDCT to LDCT  
+
+---
+
+### 2. Segmentation
+- UNet-based lung segmentation  
+
+Generates:
+- Lung mask  
+- Bone mask  
+- Soft tissue mask  
+
+---
+
+### 3. Region-Adaptive Denoising (Phase 2)
+
+Different filters are applied per region:
+
+- **Lung →** Bilateral + NLM  
+- **Bone →** NLM + BM3D  
+- **Soft Tissue →** BM3D  
+
+This ensures **structure-aware denoising**.
+
+---
+
+### 4. CNN Refinement (Phase 3)
+
+A lightweight CNN refines the denoised image.
+
+#### Input Channels
+- LDCT image  
+- Region-adaptive output  
+- Lung mask  
+
+#### Architecture
+Conv (3 → 32) → ReLU
+Conv (32 → 32) → ReLU
+Conv (32 → 1)
+
+
+#### Loss Function
+L1 + SSIM
+
+
+The CNN learns **residual refinement** over the denoised image.
+
+---
+
+## Evaluation
+
+Metrics are computed **only inside the lung region**:
+
+- PSNR (Peak Signal-to-Noise Ratio)  
+- SSIM (Structural Similarity Index)  
+
+---
+
+## Final Results
+
+| Method | PSNR | SSIM |
+|--------|------|------|
+| LDCT   | 25.03 ± 0.35 | 0.9536 ± 0.0229 |
+| REGION | 29.25 ± 1.43 | 0.9785 ± 0.0089 |
+| CNN    | **32.49 ± 0.60** | **0.9907 ± 0.0029** |
+
+---
+
+## Key Observations
+
+- Region-based denoising significantly improves image quality  
+- CNN provides final refinement (~+3 dB PSNR gain)  
+- No overfitting due to early stopping  
+- Strong generalization on unseen test patients  
 
 ---
 
 ## Project Structure
-
-```
 CT_Datasets
 ├── NDCT
 ├── NDCT_Eval
 ├── LDCT
-├── LDCT_Enhanced
-├── Phase1_Classical
-├── Phase2_RegionAdaptive
+├── Segmentation
+├── Phase2_Output
 ├── Phase3_CNN_Refined
 └── CNN_Dataset_PatientWise
-```
 
-Main scripts:
-
-```
-main_pipeline.py
-segmentation.py
-enhancement.py
-ldct_simulation.py
-cnn_inference.py
-metrics_all.py
-```
-
----
-
-## Model
-
-CNN architecture:
-
-```
-Input Channels: 3
-- LDCT
-- Region-Adaptive Output
-- Lung Mask
-
-Conv(3 → 32)
-ReLU
-Conv(32 → 32)
-ReLU
-Conv(32 → 1)
-```
-
-Loss function:
-
-```
-L1 Loss + SSIM Loss
-```
-
----
-
-## Evaluation Metrics
-
-Image quality is evaluated using:
-
-* **PSNR (Peak Signal-to-Noise Ratio)**
-* **SSIM (Structural Similarity Index)**
-
-Metrics are computed **within the lung region mask** to focus on clinically relevant structures.
-
----
-
-## Results (Example)
-
-| Method              | PSNR   | SSIM  |
-| ------------------- | ------ | ----- |
-| LDCT                | ~25–27 | ~0.90 |
-| Classical Denoising | ~29–31 | ~0.96 |
-| Region-Adaptive     | ~31–33 | ~0.98 |
-| CNN Refined         | ~33+   | ~0.99 |
 
 ---
 
 ## Key Features
 
-* Physics-based LDCT noise simulation
-* Segmentation-guided denoising
-* Region-adaptive filtering
-* Lightweight CNN refinement
-* Patient-wise evaluation
+- Physics-based LDCT simulation  
+- Segmentation-guided processing  
+- Region-adaptive denoising  
+- Lightweight CNN refinement  
+- Patient-wise evaluation  
+- Strong quantitative improvements  
+
+---
+
+## Conclusion
+
+This hybrid approach effectively combines classical denoising methods with CNN-based refinement.
+
+It achieves **high-quality CT reconstruction** with minimal model complexity and strong generalization performance.
