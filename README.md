@@ -113,19 +113,19 @@ Metrics are computed **only inside the lung region**:
 - No overfitting due to early stopping  
 - Strong generalization on unseen test patients  
 
----
 
 ## Project Structure
+
+```
 CT_Datasets
-```├── NDCT
+├── NDCT
 ├── NDCT_Eval
 ├── LDCT
 ├── Segmentation
 ├── Phase2_Output
 ├── Phase3_CNN_Refined
-└── CNN_Dataset_PatientWise```
-
----
+└── CNN_Dataset_PatientWise
+```---
 
 ## Key Features
 
