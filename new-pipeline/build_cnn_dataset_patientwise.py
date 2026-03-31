@@ -2,36 +2,39 @@ import os
 import cv2
 import numpy as np
 
-
 # ==========================
-# PATHS
+# PATHS (MATCH EVALUATION)
 # ==========================
 
-LDCT_ROOT = r"D:\CT_Datasets\LDCT"
-REGION_ROOT = r"D:\CT_Datasets\Phase2_RegionAdaptive"
-MASK_ROOT = r"D:\CT_Datasets\LDCT_Enhanced"
+LDCT_ROOT   = r"D:\CT_Datasets\LDCT"
+SEG_ROOT    = r"D:\CT_Datasets\Segmentation"
+PHASE2_ROOT = r"D:\CT_Datasets\Phase2_Output"
 
 OUTPUT_ROOT = r"D:\CT_Datasets\CNN_Dataset_PatientWise"
 
+# ==========================
+# OUTPUT FOLDERS
+# ==========================
 
 TRAIN_INPUT = os.path.join(OUTPUT_ROOT, "train_inputs")
 TRAIN_TARGET = os.path.join(OUTPUT_ROOT, "train_targets")
 
-os.makedirs(TRAIN_INPUT, exist_ok=True)
-os.makedirs(TRAIN_TARGET, exist_ok=True)
+VAL_INPUT = os.path.join(OUTPUT_ROOT, "val_inputs")
+VAL_TARGET = os.path.join(OUTPUT_ROOT, "val_targets")
 
+TEST_INPUT = os.path.join(OUTPUT_ROOT, "test_inputs")
+TEST_TARGET = os.path.join(OUTPUT_ROOT, "test_targets")
+
+for p in [TRAIN_INPUT, TRAIN_TARGET, VAL_INPUT, VAL_TARGET, TEST_INPUT, TEST_TARGET]:
+    os.makedirs(p, exist_ok=True)
 
 # ==========================
 # PATIENT SPLIT
 # ==========================
 
-TRAIN_PATIENTS = [
-"LIDC-IDRI-0001","LIDC-IDRI-0002","LIDC-IDRI-0003","LIDC-IDRI-0004","LIDC-IDRI-0005",
-"LIDC-IDRI-0006","LIDC-IDRI-0007","LIDC-IDRI-0008","LIDC-IDRI-0009","LIDC-IDRI-0010",
-"LIDC-IDRI-0011","LIDC-IDRI-0012","LIDC-IDRI-0013","LIDC-IDRI-0014","LIDC-IDRI-0015",
-"LIDC-IDRI-0016","LIDC-IDRI-0017","LIDC-IDRI-0018","LIDC-IDRI-0019","LIDC-IDRI-0020"
-]
-
+TRAIN_PATIENTS = [f"LIDC-IDRI-{i:04d}" for i in range(1, 21)]
+VAL_PATIENTS   = [f"LIDC-IDRI-{i:04d}" for i in range(21, 24)]
+TEST_PATIENTS  = [f"LIDC-IDRI-{i:04d}" for i in range(24, 27)]
 
 # ==========================
 # IMAGE LOADER
@@ -39,99 +42,107 @@ TRAIN_PATIENTS = [
 
 def load_image(path):
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        return None
     return img.astype(np.float32) / 255.0
 
+# ==========================
+# COUNTERS
+# ==========================
 
-sample_index = 0
-
+train_count = 0
+val_count = 0
+test_count = 0
 
 # ==========================
-# DATASET CREATION LOOP
+# MAIN LOOP (MATCHED LOGIC)
 # ==========================
 
 for root, dirs, files in os.walk(LDCT_ROOT):
 
-    # --- Detect patient ID safely ---
-    patient_id = None
-
-    for part in root.split(os.sep):
-        if part.startswith("LIDC-IDRI-"):
-            patient_id = part
-            break
-
-    if patient_id is None:
+    # match patient
+    if not any(p in root for p in TRAIN_PATIENTS + VAL_PATIENTS + TEST_PATIENTS):
         continue
 
+    relative_path = os.path.relpath(root, LDCT_ROOT)
 
-    relative = os.path.relpath(root, LDCT_ROOT)
-
+    seg_root = os.path.join(SEG_ROOT, relative_path)
+    den_root = os.path.join(PHASE2_ROOT, relative_path)
 
     for file in files:
 
         if not file.endswith("_ldct.png"):
             continue
 
-
         base = file.replace("_ldct.png", "")
-
 
         ldct_path = os.path.join(root, base + "_ldct.png")
         ndct_path = os.path.join(root, base + "_ndct.png")
+        mask_path = os.path.join(seg_root, base + "_lung_mask.png")
+        region_path = os.path.join(den_root, base + "_region.png")
 
-
-        region_path = os.path.join(
-            REGION_ROOT,
-            relative,
-            base + "_region_adaptive.png"
-        )
-
-
-        mask_path = os.path.join(
-            MASK_ROOT,
-            relative,
-            base + "_lung_mask.png"
-        )
-
-
-        # Skip if any required file missing
-        if not all(os.path.exists(p) for p in
-                   [ldct_path, ndct_path, region_path, mask_path]):
+        # check all exist
+        if not all(os.path.exists(p) for p in [ldct_path, ndct_path, mask_path, region_path]):
             continue
 
-
         ldct = load_image(ldct_path)
+        ndct = load_image(ndct_path)
         region = load_image(region_path)
         mask = load_image(mask_path)
-        ndct = load_image(ndct_path)
 
+        if ldct is None or ndct is None or region is None or mask is None:
+            continue
 
         mask = (mask > 0.5).astype(np.float32)
 
+        # same filtering as evaluation
+        kernel = np.ones((3, 3), np.uint8)
+        mask = cv2.erode(mask, kernel, iterations=1)
 
-        # Skip slices with tiny lung
         if np.sum(mask) / mask.size < 0.05:
             continue
 
+        # ==========================
+        # INPUT / TARGET
+        # ==========================
 
         input_tensor = np.stack([ldct, region, mask], axis=0)
         target_tensor = ndct[np.newaxis, :, :]
 
-
-        sample_name = f"sample_{sample_index:06d}.npy"
-
+        # detect patient
+        patient_id = None
+        for part in root.split(os.sep):
+            if part.startswith("LIDC-IDRI-"):
+                patient_id = part
+                break
 
         # ==========================
-        # SAVE TRAIN / TEST
+        # SAVE
         # ==========================
 
         if patient_id in TRAIN_PATIENTS:
+            name = f"train_{train_count:06d}.npy"
+            np.save(os.path.join(TRAIN_INPUT, name), input_tensor)
+            np.save(os.path.join(TRAIN_TARGET, name), target_tensor)
+            train_count += 1
 
-            np.save(os.path.join(TRAIN_INPUT, sample_name), input_tensor)
-            np.save(os.path.join(TRAIN_TARGET, sample_name), target_tensor)
+        elif patient_id in VAL_PATIENTS:
+            name = f"val_{val_count:06d}.npy"
+            np.save(os.path.join(VAL_INPUT, name), input_tensor)
+            np.save(os.path.join(VAL_TARGET, name), target_tensor)
+            val_count += 1
 
+        elif patient_id in TEST_PATIENTS:
+            name = f"test_{test_count:06d}.npy"
+            np.save(os.path.join(TEST_INPUT, name), input_tensor)
+            np.save(os.path.join(TEST_TARGET, name), target_tensor)
+            test_count += 1
 
-        sample_index += 1
+# ==========================
+# SUMMARY
+# ==========================
 
-
-print("\nDataset creation finished.")
-print("Total samples:", sample_index)
+print("\n✅ Dataset creation finished.")
+print("Train samples:", train_count)
+print("Val samples:", val_count)
+print("Test samples:", test_count)
