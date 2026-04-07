@@ -11,6 +11,11 @@ SEG_ROOT    = r"D:\CT_Datasets\Segmentation"
 REDCNN_ROOT = r"D:\RED_CNN_Output"
 
 # =============================
+# TEST PATIENTS ONLY
+# =============================
+TEST_PATIENTS = [f"LIDC-IDRI-{i:04d}" for i in range(24, 27)]
+
+# =============================
 # BUILD RED-CNN INDEX (PATIENT + SLICE)
 # =============================
 redcnn_index = {}
@@ -19,14 +24,11 @@ for root, _, files in os.walk(REDCNN_ROOT):
     for f in files:
         if f.endswith("_redcnn.png"):
 
-            # extract slice id
             name = f.replace("_redcnn.png", "")
             slice_id = name.split("_")[-1]
 
-            # extract patient id
-            parts = root.split(os.sep)
             patient_id = None
-            for p in parts:
+            for p in root.split(os.sep):
                 if p.startswith("LIDC-IDRI-"):
                     patient_id = p
                     break
@@ -61,13 +63,23 @@ def compute_ssim(gt, pred, mask):
     return ssim(gt * mask, pred * mask, data_range=1.0)
 
 # =============================
-# MAIN LOOP
+# MAIN LOOP (TEST ONLY)
 # =============================
 psnr_list = []
 ssim_list = []
 missing = 0
 
 for root, _, files in os.walk(LDCT_ROOT):
+
+    # 🔥 restrict to test patients
+    patient_id = None
+    for part in root.split(os.sep):
+        if part.startswith("LIDC-IDRI-"):
+            patient_id = part
+            break
+
+    if patient_id not in TEST_PATIENTS:
+        continue
 
     for file in files:
 
@@ -76,16 +88,6 @@ for root, _, files in os.walk(LDCT_ROOT):
 
         base = file.replace("_ndct.png", "")
         slice_id = base.split("_")[-1]
-
-        # extract patient id
-        patient_id = None
-        for part in root.split(os.sep):
-            if part.startswith("LIDC-IDRI-"):
-                patient_id = part
-                break
-
-        if patient_id is None:
-            continue
 
         key = f"{patient_id}_{slice_id}"
 
@@ -110,7 +112,7 @@ for root, _, files in os.walk(LDCT_ROOT):
         if ndct is None or pred is None or mask is None:
             continue
 
-        # resize pred → match NDCT
+        # resize prediction → match NDCT
         pred = cv2.resize(pred, (ndct.shape[1], ndct.shape[0]))
 
         mask = (mask > 0.5).astype(np.uint8)
@@ -131,7 +133,7 @@ for root, _, files in os.walk(LDCT_ROOT):
 # =============================
 # RESULTS
 # =============================
-print("\n===== RED-CNN RESULTS =====")
+print("\n===== RED-CNN RESULTS (TEST ONLY) =====")
 
 if len(psnr_list) == 0:
     print("❌ No valid matches found")
