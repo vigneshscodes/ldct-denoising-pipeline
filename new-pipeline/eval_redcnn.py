@@ -138,7 +138,6 @@ print("\n===== RED-CNN RESULTS (TEST ONLY) =====")
 if len(psnr_list) == 0:
     print("❌ No valid matches found")
 else:
-    print(f"PSNR: {np.mean(psnr_list):.2f}")
-    print(f"SSIM: {np.mean(ssim_list):.4f}")
-    print(f"Used: {len(psnr_list)}")
-    print(f"Missing: {missing}")
+    print(f"PSNR: {np.mean(psnr_list):.2f} ± {np.std(psnr_list):.2f}")
+    print(f"SSIM: {np.mean(ssim_list):.4f} ± {np.std(ssim_list):.4f}")
+
