@@ -130,6 +130,23 @@ CT_Datasets
 
 ---
 
+## Execution Order
+
+1. main_pipeline.py  
+   (LDCT simulation, preprocessing, segmentation)
+
+2. region_adaptive_denoising_phase2.py  
+
+3. build_cnn_dataset_patientwise.py  
+
+4. cnn_inference.py  
+
+5. metrics_all.py  
+
+6. visuals.py  
+
+---
+
 ## Key Features
 
 - Physics-based LDCT simulation  

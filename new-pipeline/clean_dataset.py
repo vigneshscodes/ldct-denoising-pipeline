@@ -46,14 +46,14 @@ for split in splits:
             if not (os.path.exists(ndct) and os.path.exists(mask)):
                 continue
 
-            # 🔥 LOAD MASK
+            #  LOAD MASK
             m = cv2.imread(mask, 0)
             if m is None:
                 continue
 
             m = (m > 127).astype(np.uint8)
 
-            # 🔥 APPLY 5% RULE
+            #  APPLY 5% RULE
             if np.sum(m) / m.size < 0.05:
                 continue
 
@@ -61,4 +61,4 @@ for split in splits:
             shutil.copy(ldct, os.path.join(patient_folder, base + "_ldct.png"))
             shutil.copy(ndct, os.path.join(patient_folder, base + "_ndct.png"))
 
-print("✅ FILTERED DATASET CREATED (5% RULE APPLIED)")
+print(" FILTERED DATASET CREATED (5% RULE APPLIED)")

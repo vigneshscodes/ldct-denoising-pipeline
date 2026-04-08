@@ -12,8 +12,8 @@ scikit-image
 scikit-learn
 
 pydicom
-pywavelets
 bm3d
 
 matplotlib
 tqdm
+

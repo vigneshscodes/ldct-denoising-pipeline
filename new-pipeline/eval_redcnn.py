@@ -71,7 +71,7 @@ missing = 0
 
 for root, _, files in os.walk(LDCT_ROOT):
 
-    # 🔥 restrict to test patients
+    # restrict to test patients
     patient_id = None
     for part in root.split(os.sep):
         if part.startswith("LIDC-IDRI-"):
@@ -136,7 +136,7 @@ for root, _, files in os.walk(LDCT_ROOT):
 print("\n===== RED-CNN RESULTS (TEST ONLY) =====")
 
 if len(psnr_list) == 0:
-    print("❌ No valid matches found")
+    print("No valid matches found")
 else:
     print(f"PSNR: {np.mean(psnr_list):.2f} ± {np.std(psnr_list):.2f}")
     print(f"SSIM: {np.mean(ssim_list):.4f} ± {np.std(ssim_list):.4f}")
