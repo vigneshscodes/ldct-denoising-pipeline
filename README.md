@@ -96,6 +96,16 @@ Metrics are computed **only inside the lung region**:
 
 ---
 
+## Visual Results 
+
+###Comparison 
+(new-pipeline/figure_full_comparison.png) 
+
+### Segmentation Masks 
+(new-pipeline/figure_masks.png)
+
+---
+
 ## Final Results
 
 | Method | PSNR | SSIM |
